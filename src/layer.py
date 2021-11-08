@@ -11,10 +11,10 @@ class Layer:
 	def update_metadata(self):
 		metadata = self.directory / 'metadata.json'
 
-    	content = {'layerDirectory': self.directory, 'description': self.layer_description, 'pipelineID': self.pipeline_id}
+		content = {'layerDirectory': self.directory, 'description': self.layer_description, 'pipelineID': self.pipeline_id}
 
-    	with open(metadata.text, 'w') as f:
-    		json.dump(content, f)
+		with open(metadata.text, 'w') as f:
+			json.dump(content, f)
 
 
 
