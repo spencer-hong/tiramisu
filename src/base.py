@@ -28,7 +28,7 @@ class Base:
 
 			copy_files(file, self.base_dir / 'base', 'f' + str(new_id) + '.' + extension )
 
-			self.filephases[new_id] = {'filephases': [], 'layers': []}
+			self.filephases[str(new_id)] = {'filephases': [], 'layers': []}
 
 
 		self.update_metadata()
@@ -37,11 +37,11 @@ class Base:
 
 		metadata = self.base_dir / 'metadata.json'
 
-		content = {'baseDirectory': self.base_dir.as_posix(), 'description': self.description, 'layers' : [(layer.name, layer.description) for layer in self.layers]}
+		content = {'baseDirectory': self.base_dir.as_posix(), 'description': self.description, 'layers' : [layer.layer_name for layer in self.layers]}
 
 		with open(metadata.as_posix(), 'w') as f:
 			json.dump(content, f)
-
+			f.write('\n')
 			json.dump(self.filephases, f)
 
 
@@ -52,8 +52,8 @@ class Base:
 
 			for base_file in self.base_files:
 
-				self.filephases[base_file]['filephases'].append(0)
-				self.filephases[base_file]['layers'].append('base')
+				self.filephases[str(base_file)]['filephases'].append(0)
+				self.filephases[str(base_file)]['layers'].append('base')
 
 		else:
 			layer_dir = self.base_dir / layer_name
@@ -63,19 +63,20 @@ class Base:
 			files = get_all_files(layer_dir.as_posix())
 
 
-			fileIDs = dict([(int(Path(file).name.split('-')[0].split('f')[-1]), int(Path(file).name.split('-')[-1].split('.')[0].split('p')[-1])) for file in files])
+			fileIDs = dict([(Path(file).name.split('-')[0].split('f')[-1], int(Path(file).name.split('-')[-1].split('.')[0].split('p')[-1])) for file in files])
 
 			for base_file in self.base_files:
 
-				if base_file in fileIDs:
+				if str(base_file) in fileIDs:
 
-					self.filephases[base_file]['filephases'].append(fileIDs[base_file])
-					self.filephases[base_file]['layers'].append(layer_name)
+					self.filephases[str(base_file)]['filephases'].append(fileIDs[str(base_file)])
+					self.filephases[str(base_file)]['layers'].append(layer_name)
 				else:
-					self.filephases[base_file]['filephases'].append(None)
-					self.filephases[base_file]['layers'].append(None)
+					self.filephases[str(base_file)]['filephases'].append(None)
+					self.filephases[str(base_file)]['layers'].append(None)
 
 
+		self.update_metadata()
 	def eliminate_layers(self, layer_name):
 
 		index = [layer.name for layer in self.layers].index(layer_name)
@@ -98,6 +99,8 @@ class Base:
 
 		self.layers[-1].update_metadata()
 
+		self.update_metadata()
+
 
 	def return_current_layers(self):
 		return dict([(key, lastlayer['layers'][-1]) for key, lastlayer in self.filephases.items()])
@@ -119,6 +122,28 @@ class Base:
 			self.base_files.append(new_id)
 			return new_id
 
+	def read(self):
+
+		with open(self.base_dir / 'metadata.json', 'r') as f:
+			metadata = [json.loads(line) for line in f]
+
+		self.description = metadata[0]['description']
+
+		self.layers = []
+		layers = metadata[0]['layers']
+
+		for layer in layers:
+			layer_path = self.base_dir / layer
+
+			with open(layer_path / 'metadata.json', 'r') as f:
+				layer_data = json.load(f)
+
+			self.layers.append(Layer(layer_data['layer_name'], layer_data['description'], layer_data['pipelineID'], layer_data['layerDirectory']))
+
+		self.base_files = [int(x) for x in metadata[1].keys()]
+
+		self.filephases = metadata[1]
+
 
 def get_all_files(directory):
 
@@ -138,6 +163,5 @@ def make_folder(file_dir, name):
 
 def remove_folder(directory):
 	rmtree(directory)
-
 
 
