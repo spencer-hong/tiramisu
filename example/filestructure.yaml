@@ -1,0 +1,118 @@
+ORIGINAL_CORPUS:
+    - file_01.docx (ID 0001)
+    - file_02.pdf (ID 0002)
+    - file_03.docx (ID 0003)
+    - file_03.pdf (ID 0004, requires changing to docx)
+    - folder_01:
+        - file_0101.xlsx (ID 0005)
+        - file_0102.png (ID 0006, zero length)
+        - folder_02:
+            - file_010101.pdf (ID 0007)
+            - file_010102.txt (ID 0008)
+    - zip_01.zip (ID 0009):
+        - file_0101.pdf (ID 0010)
+        - file_0102.xls (ID 0011)
+        - folder_03:
+            - file_010101.txt (ID 0012)
+            - file_010102.jpeg (ID 0013)
+        - zip_02.zip (ID 0014):
+            - file_0101.txt (ID 0015)
+            - file_0102.pdf (ID 0016, zero length)
+
+
+
+DIGESTED_CORPUS:
+    metadata.json
+    Base (read_only):
+        - 0001.docx
+        - 0002.pdf
+        - 0003.docx
+        - 0004.pdf
+        - folder_01:
+            - 0005.xlsx
+            - 0006.png
+            - folder_02:
+                - 0007.pdf
+                - 0008.txt
+        - 0009.zip
+
+    Layer 1 (defolder + unzip loop):
+        - folder_01 (parent):
+            - 0005.xlsx
+            - 0006.png
+        - folder_02 (child to folder_01):
+            - 0007.pdf
+            - 0008.txt
+        - 0009 (parent):
+            - 0010.pdf
+            - 0011.xls
+        - folder_03 (child to 0009):
+            - 0012.txt
+            - 0011.xls
+        - 0014 (child to 0009):
+            - 0015.txt
+            - 0016.pdf
+
+    Layer 2 (file correction):
+        - 0004 (folder name is the ID name):
+            - 0004.docx (corrected pdf to docx)
+        - 0006 (to be deleted):
+            - .delete (stand-in to know that the file has been removed)
+        - 0016 (to be deleted):
+            - .delete
+
+    Layer 3 (split into pages):
+        - 0002 (only showing one as an example):
+            - 0017.pdf (unique ID assigned to this single page file)
+            - 0018.pdf
+            - 0019.pdf
+    Layer 4 (convert to image):
+        - 0017 (only showing one as an example):
+            - 0020.png
+
+    Layer 5 (extract text):
+        - 0020 (the image becomes a container):
+            - 0021.txt 
+
+
+
+file:
+    id:
+        - 0001
+        - 0005
+        - 0007
+        - 0009
+        - 0010
+        - 0015
+        - 0017
+    containerID:
+        - (root container ID)
+        - folder_01
+        - folder_02
+        - (root container ID)
+        - 0009 (same fileID is used for containerID)
+        - 0014
+        - 0002
+
+
+
+
+container:
+    id:
+        - folder_01
+        - folder_02
+        - 0009
+        - 0014
+        - 0002
+
+    parentID:
+        - (root container ID)
+        - folder_01
+        - (root container ID)
+        - 0009
+        - (root container ID)
+
+
+
+
+
