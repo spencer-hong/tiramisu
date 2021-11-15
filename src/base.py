@@ -2,7 +2,6 @@ from pathlib import Path
 import json
 from shutil import copy, rmtree
 from layer import Layer
-
 class Base:
 	def __init__(self, base_dir, description = None):
 		self.base_dir = Path(base_dir)
@@ -10,28 +9,39 @@ class Base:
 		self.base_files = []
 		self.filephases ={}
 		self.layers = []
+		self.database = None
 
 
 	def prepare_base(self, file_dir):
 
 		files = get_all_files(file_dir)
+		try:
+			make_folder(self.base_dir, 'base')
+		except FileExistsError:
+			pass 
 
-		make_folder(self.base_dir, 'base')
+
+		to_be_saved = {}
+		counter = 0
 		for file in files:
 
+			for folder in file.relative_to(file_dir).
 
+			to_be_saved[counter] = {'fileID': str(new_id), 'containerID': 'root', 'filePhase': 'base', \
+			'fileExtension': extension, 'originalName': file.name, 'originalFilePath': file.as_posix()}
 
-			extension = file.split('.')[-1]
+			extension = file.suffix
 			new_id = self.generate_id()
 
-			# self.base_files.append(new_id)
 
-			copy_files(file, self.base_dir / 'base', 'f' + str(new_id) + '.' + extension )
+			copy_files(file, self.base_dir / 'base', 'f' + str(new_id) +  extension, relative_to = file_dir)
 
-			self.filephases[str(new_id)] = {'filephases': [], 'layers': []}
-
+			# self.filephases[str(new_id)] = {'filephases': [], 'layers': []}
 
 		self.update_metadata()
+
+		self.database = pd.DataFrame(to_be_saved)
+
 
 	def update_metadata(self):
 
@@ -43,7 +53,6 @@ class Base:
 			json.dump(content, f)
 			f.write('\n')
 			json.dump(self.filephases, f)
-
 
 
 	def set_files(self, layer_name):
@@ -113,6 +122,8 @@ class Base:
 		return  dict([(key, lastlayer['filephases']) for key, lastlayer in self.filephases.items()])
 
 	def generate_id(self):
+		# auto_increment 1
+
 		if len(self.base_files) == 0:
 			self.base_files.append(0)
 			return 0
@@ -148,13 +159,18 @@ class Base:
 def get_all_files(directory):
 
 	p = Path(directory)
-	filtered = [x.as_posix() for x in p.glob("**/*") if not x.name.startswith("metadata.json")]
+	filtered = [x.relative_to(directory) for x in p.glob("**/*") if (not x.name.startswith('.'))]
 
 	return filtered
 
-def copy_files(file_dir, to_dir, filename):
+def copy_files(file_dir, to_dir, filename, relative_to = None):
 
-	copy(Path(file_dir), Path(to_dir) / filename)
+
+	new_path = to_dir / file_dir
+	new_path.parent.mkdir(parents = True, exist_ok = True)
+	if relative_to:
+		file_dir = relative_to / file_dir
+	copy(file_dir, new_path.parent / filename)
 
 def make_folder(file_dir, name):
 	new_folder = file_dir / name
