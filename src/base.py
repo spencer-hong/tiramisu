@@ -49,10 +49,6 @@ class Base:
                                           'parentID': container_ids[file.relative_to(file_dir).parent.as_posix()]}
 
                 temp_id = str(new_id) + '.folder'
-                (self.base_dir / 'base' / (
-                        str(container_ids[file.relative_to(file_dir).parent.as_posix()]) + '.folder')).mkdir(
-                    parents=True, exist_ok=True)
-
                 with open(self.base_dir / 'base' / (
                         str(container_ids[file.relative_to(file_dir).parent.as_posix()]) + '.folder') / temp_id,
                           'w') as f:
@@ -110,39 +106,37 @@ class Base:
                                                   file.relative_to(extract_dir).parent.as_posix()]}
 
                     zip_list.append((new_id, file.as_posix()))
+
+                    if zip_list[0][0] == container_ids[file.relative_to(extract_dir).parent.as_posix()]:
+                        copy_files(file, self.base_dir / 'base' / (
+                                str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.zip'),
+                                   str(new_id) + extension)
+                    else:
+                        copy_files(file, self.base_dir / 'base' / (
+                                str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder'),
+                                   str(new_id) + extension)
                 elif file.is_dir():
                     if not file.relative_to(extract_dir).as_posix() in container_ids:
                         container_ids[file.relative_to(extract_dir).as_posix()] = new_id
-
+                    temp_id = str(new_id) + '.folder'
                     file_df_saved[counter] = {'containerID': new_id, 'filePhase': 0, 'layer': 'base',
                                               'fileExtension': '.folder', 'originalName': file.name,
                                               'originalPath': file.as_posix(),
-                                              'relativePath': str(container_ids[file.relative_to(
-                                                  extract_dir).parent.as_posix()]) + '.folder',
+                                              'relativePath': temp_id,
                                               'parentID': container_ids[
                                                   file.relative_to(extract_dir).parent.as_posix()]}
 
-                    temp_id = str(new_id) + '.folder'
-                    (self.base_dir / 'base' / (
-                            str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder')).mkdir(
-                        parents=True, exist_ok=True)
-
-                    with open(self.base_dir / 'base' / (
-                            str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder') / temp_id,
-                              'w') as f:
-                        pass
+                    if zip_list[0][0] == container_ids[file.relative_to(extract_dir).parent.as_posix()]:
+                        with open(self.base_dir / 'base' / (
+                                str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.zip') / temp_id,
+                                  'w') as f:
+                            pass
+                    else:
+                        with open(self.base_dir / 'base' / (
+                                str(container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder') / temp_id,
+                                  'w') as f:
+                            pass
                 else:
-                    file_df_saved[counter] = {'containerID': new_id, 'filePhase': 0, 'layer': 'base',
-                                              'fileExtension': extension, 'originalName': file.name,
-                                              'originalPath': file.as_posix(),
-                                              'relativePath': (Path(str(
-                                                  container_ids[
-                                                      file.relative_to(extract_dir).parent.as_posix()]) + '.folder') / (
-                                                                       str(new_id) + extension)).as_posix(),
-                                              'parentID': container_ids[
-                                                  file.relative_to(extract_dir).parent.as_posix()]}
-
-
                     if file.relative_to(extract_dir).parent.as_posix() == '.':
                         file_df_saved[counter] = {'containerID': new_id, 'filePhase': 0, 'layer': 'base',
                                                   'fileExtension': extension, 'originalName': file.name,
@@ -168,9 +162,15 @@ class Base:
                                                                            str(new_id) + extension)).as_posix(),
                                                   'parentID': container_ids[
                                                       file.relative_to(extract_dir).parent.as_posix()]}
-                        copy_files(file, self.base_dir / 'base' / (str(
-                            container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder'),
-                                   str(new_id) + extension)
+
+                        if zip_list[0][0] == container_ids[file.relative_to(extract_dir).parent.as_posix()]:
+                            copy_files(file, self.base_dir / 'base' / (str(
+                                container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.zip'),
+                                       str(new_id) + extension)
+                        else:
+                            copy_files(file, self.base_dir / 'base' / (str(
+                                container_ids[file.relative_to(extract_dir).parent.as_posix()]) + '.folder'),
+                                       str(new_id) + extension)
 
                 new_id = self.generate_id()
                 counter += 1
