@@ -1,5 +1,5 @@
 from pathlib import Path
-
+# from base import make_folder
 import json
 class Layer:
 	def __init__(self, layer_name, layer_description, pipeline_id, directory):
@@ -15,6 +15,14 @@ class Layer:
 
 		with open(metadata.as_posix(), 'w') as f:
 			json.dump(content, f)
+
+
+	# def prepare_layer(self, list_of_files):
+
+	# 	for file in list_of_file:
+			
+
+
 
 
 
