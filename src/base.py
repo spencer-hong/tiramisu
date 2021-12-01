@@ -305,10 +305,10 @@ class Base:
                 'filePhases'].to_dict()
 
     def dump_database(self):
-        self.database.to_parquet('database.parquet')
+        self.database.to_parquet( self.baseDir / 'database.parquet')
 
     def read_database(self):
-        self.database = pd.read_parquet('database.parquet')
+        self.database = pd.read_parquet(self.baseDir/'database.parquet')
 
     def update_metadata(self):
 
