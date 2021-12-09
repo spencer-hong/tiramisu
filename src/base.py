@@ -4,15 +4,25 @@ from shutil import copy, rmtree
 from layer import Layer
 from zipfile import ZipFile
 import pandas as pd
-
+# from magic import from_file
 
 class Base:
     def __init__(self, baseDir, description=None):
-        self.baseDir = Path(baseDir)
-        self.description = description
-        self.baseFiles = []
-        self.layers = ['base']
-        self.database = None
+        if (Path(baseDir) / 'base' / 'metadata.json').is_file():
+            with open((Path(baseDir) / 'base' / 'metadata.json').as_posix(), 'r') as f:
+                metadata = json.load(f)
+            self.baseDir = Path(baseDir)
+            self.description = metadata['description']
+            self.baseFiles = -1
+            self.database = self.read_database()
+            self.layers = metadata['layers']
+
+        else:
+            self.baseDir = Path(baseDir)
+            self.description = description
+            self.baseFiles = -1
+            self.layers = ['base']
+            self.database = None
 
     def prepare_base(self, fileDir):
 
@@ -67,7 +77,8 @@ class Base:
                     container_ids[file.relative_to(fileDir).as_posix()] = newID
                 fileID = str(newID) + '.folder'
                 # save it to the list of dictionaries
-                file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
+                file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + '.folder',
+                                          'layer': 'base',
                                           'fileExtension': '.folder', 'originalName': file.name,
                                           'originalPath': file.as_posix(),
                                           'relativePath':  fileID,
@@ -90,7 +101,8 @@ class Base:
             else:
                 fileID = str(newID) + extension
                 # save it in the list of dictionary
-                file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
+                file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
+                                          'layer': 'base',
                                           'fileExtension': extension, 'originalName': file.name,
                                           'originalPath': file.as_posix(),
                                           'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
@@ -124,6 +136,10 @@ class Base:
             # we store all of the unzipped files temporarily in a /tmp folder
             extractDir = self.baseDir / 'base' / zipID / 'tmp'
             make_folder(self.baseDir / 'base' / zipID, 'tmp')
+
+            if Path('tmp/__MACOSX').is_dir():
+                shutil.rmtree('tmp/__MACOSX')
+
             with ZipFile(zipList[0][1], 'r') as zipRef:
 
                 listOfFileNames = zipRef.namelist()
@@ -151,7 +167,8 @@ class Base:
                 extension = file.suffix.lower()
 
                 if extension == '.zip':
-                    file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
+                    file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
+                                              'layer': 'base',
                                               'fileExtension': extension, 'originalName': file.name,
                                               'originalPath': file.as_posix(),
                                               'relativePath': (str(newID) + '.zip'),
@@ -179,7 +196,8 @@ class Base:
                     if not file.relative_to(extractDir).as_posix() in container_ids:
                         container_ids[file.relative_to(extractDir).as_posix()] = newID
                     temp_id = str(newID) + '.folder'
-                    file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
+                    file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + '.folder',
+                                              'layer': 'base',
                                               'fileExtension': '.folder', 'originalName': file.name,
                                               'originalPath': file.as_posix(),
                                               'relativePath': temp_id,
@@ -205,8 +223,8 @@ class Base:
                     # if the file is at the root folder, the file must be copied into the .zip file
                     # since the "root" of the file is at the root of the zip file
                     if file.relative_to(extractDir).parent.as_posix() == '.':
-                        file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
-                                                  'fileExtension': extension, 'originalName': file.name,
+                        file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
+                                                  'layer': 'base', 'fileExtension': extension, 'originalName': file.name,
                                                   'originalPath': file.as_posix(),
                                                   'relativePath': (Path(str(
                                                       container_ids[
@@ -221,8 +239,8 @@ class Base:
 
                     # if not, copy the file to a .folder folder
                     else:
-                        file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
-                                                  'fileExtension': extension, 'originalName': file.name,
+                        file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
+                                                  'layer': 'base','fileExtension': extension, 'originalName': file.name,
                                                   'originalPath': file.as_posix(),
                                                   'relativePath': (Path(str(
                                                       container_ids[
@@ -246,62 +264,75 @@ class Base:
 
         self.database = pd.DataFrame.from_dict(file_df_saved, orient='index')
         self.dump_database()
+        self.update_metadata()
 
-    def set_layer(self, layer_name, layer_description, pipeline_id):
+    #this function must be run before prepare_files()
+    # pipelineID should be integer
+    def set_layer(self, layerName, layerDescription, pipelineID):
 
-        assert (self.baseDir / layer_name).exists() == False
+        assert (self.baseDir / layerName).exists() == False
 
-        make_folder(self.baseDir, layer_name)
+        make_folder(self.baseDir, layerName)
 
-        self.layers.append(layer_name)
-        temp_layer = Layer(layer_name, layer_description, pipeline_id, self.baseDir / layer_name)
-        temp_layer.update_metadata()
+        self.layers.append(layerName)
+        tempLayer = Layer(layerName, layerDescription, pipelineID, self.baseDir / layerName)
+        tempLayer.update_metadata()
 
-    def set_files(self, layer_name):
+        self.update_metadata()
 
+    # requires the two dictionaries from prepare_files()
+    def set_files(self, layerName):
+        # self.baseFiles = self.database.sort_values('containerID').iloc[-1]['containerID'] + 1
         ids = {}
         counter = 0
-        layer_path = self.baseDir / layer_name
-        files = get_all_files(layer_path)
-
-        for file in files:
-            # for parent in file.relative_to(layer_path).parents:
-            # 	if parent.as_posix() != '.':
-            if file.suffix == '.folder':
-                ids[counter] = {'containerID': int(file.stem), 'filePhase': self.layers.index(layer_name),
-                                'layer': layer_name,
-                                'fileExtension': '.folder', 'originalName': file.name,
-                                'originalPath': file.as_posix(),
-                                'relativePath': file.relative_to(layer_path).as_posix(),
-                                'parentID': file.parent.name}
-            else:
-                if not file.is_dir():
-                    ids[counter] = {'containerID': int(file.parent.stem), 'filePhase': layer_name,
-                                    'fileExtension': file.parent.suffix, 'originalName': file.name,
-                                    'originalPath': file.as_posix(),
-                                    'relativePath': file.relative_to(layer_path).as_posix(),
-                                    'parentID': return_file_parent(file=int(file.stem))}
+        layerPath = self.baseDir / layerName
+        allFiles = get_all_files(layerPath)
+        for file in allFiles:
+            if not file.is_dir() and file.name != 'metadata.json':
+                ids[counter] = {'containerID': int(file.parent.stem), 'filePhase': self.return_file_phase(file.parent.parent.name) + 1,
+                                'layer': layerName,
+                                'fileExtension': file.suffix, 'originalName': file.name, 'name': file.parent.name,
+                                'originalPath': file.parent.as_posix(),
+                                'relativePath': file.parent.relative_to(layerPath).as_posix(),
+                                'parentID': int(file.parent.parent.stem)}
+            # children = get_all_files(layerPath / file)
+            # # for parent in file.relative_to(layer_path).parents:
+            # # 	if parent.as_posix() != '.':
+            #
+            # for child in children:
+            #     if child.is_dir():
+            #         subChildren = get_all_files(child)
+            #         for subChild in subChildren:
+            #             ids[counter] = {'containerID': int(child.stem), 'filePhase': filephaseDict[file],
+            #                     'layer': layerName,
+            #                     'fileExtension': child.suffix, 'originalName': subChild.name,'name': child.name,
+            #                     'originalPath': subChild.as_posix(),
+            #                     'relativePath': subChild.relative_to(layerPath).as_posix(),
+            #                     'parentID': int(file.split('.')[0])}
 
             counter += 1
 
         self.database = pd.concat([self.database, pd.DataFrame.from_dict(ids, orient='index')], ignore_index=True)
 
+        self.dump_database()
+
+    # file is the file name (with extension)
     def return_file_parent(self, file=None):
 
         if file != None:
-            return self.database.loc[self.database.containerID == file].sort_values('filePhase').iloc[-1].set_index(
-                'containerID')['parentID'].to_dict()[file]
+            ID = int(file.split('.')[0])
+            return self.database.loc[self.database.containerID == ID].sort_values('filePhase').iloc[-1]['filePhase']
         else:
             return self.database.loc[self.database.containerID == file].sort_values('filePhase').iloc[-1].set_index(
-                'containerID')['parentID'].to_dict()
+                'name')['parentID'].to_dict()
 
     def return_file_phase(self, file=None):
-
         if file != None:
-            return self.database.loc[self.database.containerID == file].sort_values('filePhase').iloc[-1].set_index(
-                'containerID')['filePhases'].to_dict()
+
+            ID = int(file.split('.')[0])
+            return self.database.loc[self.database.containerID == ID].sort_values('filePhase').iloc[-1]['filePhase']
         else:
-            return self.database.sort_values('filePhase').groupby('containerID').tail(-1).set_index('containerID')[
+            return self.database.sort_values('filePhase').groupby('containerID').tail(-1).set_index('name')[
                 'filePhases'].to_dict()
 
     def dump_database(self):
@@ -310,12 +341,14 @@ class Base:
     def read_database(self):
         self.database = pd.read_parquet(self.baseDir/'database.parquet')
 
+        return self.database
+
     def update_metadata(self):
 
-        metadata = self.base_dir / 'metadata.json'
+        metadata = self.baseDir / 'base'/ 'metadata.json'
 
-        content = {'baseDirectory': self.base_dir.as_posix(), 'description': self.description,
-                   'layers': [layer.layer_name for layer in self.layers]}
+        content = {'baseDirectory': self.baseDir.as_posix(), 'description': self.description,
+                   'layers': [layer for layer in self.layers], 'baseFiles': self.baseFiles}
 
         with open(metadata.as_posix(), 'w') as f:
             json.dump(content, f)
@@ -323,38 +356,37 @@ class Base:
 
     def generate_id(self):
         # auto_increment 1
+        new_id = self.baseFiles + 1
 
-        if len(self.baseFiles) == 0:
-            self.baseFiles.append(0)
-            return 0
-        else:
-            new_id = sorted(self.baseFiles)[-1] + 1
+        self.baseFiles = new_id
 
-            self.baseFiles.append(new_id)
-            return new_id
+        return new_id
+        # if len(self.baseFiles) == 0:
+        #     self.baseFiles.append(0)
+        #     return 0
+        # else:
+        #     new_id = sorted(self.baseFiles)[-1] + 1
+        #
+        #     self.baseFiles.append(new_id)
+        #     return new_id
 
-    def read(self):
-
-        with open(self.baseDir / 'metadata.json', 'r') as f:
-            metadata = [json.loads(line) for line in f]
-
-        self.description = metadata[0]['description']
-
-        self.layers = []
-        layers = metadata[0]['layers']
-
-        for layer in layers:
-            layer_path = self.baseDir / layer
-
-            with open(layer_path / 'metadata.json', 'r') as f:
-                layer_data = json.load(f)
-
-            self.layers.append(Layer(layer_data['layer_name'], layer_data['description'], layer_data['pipelineID'],
-                                     layer_data['layerDirectory']))
-
-        self.baseFiles = [int(x) for x in metadata[1].keys()]
-
-        self.filephases = metadata[1]
+    def prepare_folders(self, fileList, layerName):
+        for file in fileList:
+            make_folder(self.baseDir / layerName, file)
+    # def prepare_files(self, fileList, layerName):
+    #
+    #     filePhaseDict = {}
+    #     idDict ={}
+    #     for file in fileList:
+    #         filePhase = self.return_file_phase(file)
+    #         newFilePhase = filePhase + 1
+    #
+    #         newID = self.generate_id()
+    #
+    #         filePhaseDict[file] = newFilePhase
+    #         idDict[file] = newID
+    #
+    #     return filePhaseDict, idDict
 
 
 def get_all_files(directory):
@@ -363,13 +395,12 @@ def get_all_files(directory):
 
     return filtered
 
-
 def copy_files(file_dir, to_dir, filename, relative_to=None):
-    id_name = filename.strip('f').split('.')[0]
     make_folder(to_dir, filename)
     if relative_to:
         file_dir = relative_to / file_dir
-    copy(file_dir, to_dir / filename)
+
+    copy(file_dir, to_dir / filename/filename)
 
 
 def make_folder(file_dir, name):
