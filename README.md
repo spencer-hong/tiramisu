@@ -10,6 +10,9 @@ Each file is a container that may contain more than one file. This allows Tirami
 | --------------- | --------------- | --------------- |
 | Unzip & de-folder files | Yes | --  |
 | Serialize structure for future reads| Yes | -- |
+| Correcting file extensions| No | 12/10/21 |
+| Saving file hashes| No | 12/10/21 |
+| Locking files read-only| No | 12/10/21 |
 | Digest the oldest archive files| No | 12/10/21 |
 | Speed tests and benchmarks | No | 12/12/21
 | Integrate splitting pages & converting PDFs to images | No | 12/14/21 |
@@ -18,3 +21,9 @@ Each file is a container that may contain more than one file. This allows Tirami
 | Obtain archive statistics | No | 01/04/22 |
 | Create examples for GitHub repo | No | 01/05/22 |
 | Figure out how to modify label studio with tiramisu | No | 01/05/22 |
+
+## Known limitations  
+
+| Limitation | Plans to fix it? |
+| --------------- | --------------- |
+| Unzipping only supports .zip files | Yes |
