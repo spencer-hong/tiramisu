@@ -10,7 +10,7 @@ Each file is a container that may contain more than one file. This allows Tirami
 | --------------- | --------------- | --------------- |
 | Unzip & de-folder files | Yes | 12/01/21  |
 | Serialize structure for future reads| Yes | 12/09/21 |
-| Correcting file extensions| No | 12/10/21 |
+| Correcting file extensions| Yes | 12/10/21 |
 | Saving file hashes| Yes | 12/10/21 |
 | Locking files read-only| Yes | 12/10/21 |
 | Digest the oldest archive files| No | 12/10/21 |

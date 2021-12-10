@@ -4,7 +4,7 @@ from shutil import copy, rmtree
 from layer import Layer
 from zipfile import ZipFile
 import pandas as pd
-from utils import generate_hash
+from utils import generate_hash, lock_files_read_only
 from magic import from_file
 
 class Base:
@@ -50,7 +50,7 @@ class Base:
                                   'fileExtension': '.folder', 'originalName': 'root',
                                   'originalPath': fileDir,
                                   'relativePath': '0.folder',
-                                  'parentID': 0}
+                                  'parentID': 0, 'hash': ''}
         container_ids['.'] = 0
 
 
@@ -101,14 +101,19 @@ class Base:
             else:
 
 
+
+                fileID = str(newID) + extension
+
                 copy_files(file, self.baseDir / 'base' / (
                         str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder'),
                            fileID)
 
-                extension, newFile = verify_file_type((self.baseDir / 'base' / (
-                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder') )/ fileID / fileID)
 
-                fileID = str(newID) + extension
+
+                extension, newFile = verify_file_type((self.baseDir / 'base' / (
+                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder')) / fileID / fileID)
+
+                lock_files_read_only(newFile)
                 # save it in the list of dictionary
                 file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
                                           'layer': 'base',
@@ -135,6 +140,7 @@ class Base:
         zipList = list(
             self.database.loc[self.database.fileExtension == '.zip'][['containerID', 'originalPath']].itertuples(
                 index=False, name=None))
+
 
         # a while loop to continue as long as we continue to find zip files
         while len(zipList) != 0:
@@ -174,9 +180,12 @@ class Base:
                             newID = self.generate_id()
                 extension = file.suffix.lower()
 
-                extension, newFile = verify_file_type(file)
+                if file.is_file():
+                    extension, newFile = verify_file_type(file)
 
+                    lock_files_read_only(newFile)
                 if extension == '.zip':
+
                     file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
                                               'layer': 'base',
                                               'fileExtension': extension, 'originalName': newFile.name,
@@ -194,6 +203,7 @@ class Base:
                         copy_files(newFile, self.baseDir / 'base' / (
                                 str(container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.zip'),
                                    str(newID) + extension)
+
 
                     # when file's parents is not at the root of the zip file, but some other folder.
                     # copy the file into a .folder folder, not a .zip folder.
@@ -271,6 +281,7 @@ class Base:
                             copy_files(newFile, self.baseDir / 'base' / (str(
                                 container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.folder'),
                                        str(newID) + extension)
+
 
                 newID = self.generate_id()
                 counter += 1
@@ -402,17 +413,20 @@ def verify_file_type(filepath):
     else:
         # assert len(filename.split('.')) == 2
         extension = '.' + filename.split('.')[-1]
-    filetype = from_file(filepath, mime=True)
+        extension = extension.lower()
+    filetype = from_file(filepath.as_posix(), mime=True)
     new_name = None
-    if extension.lower() not in built_in_key:
+    if extension not in built_in_key:
         if extension == '':
             if filetype in inverse_key:
-                newPath = filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
+                filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
                 # new_name = filepath.parent / (filepath.stem + inverse_key[filetype])
-                return inverse_key[filetype], newPath
+
+                filepath.parent.rename(filepath.parent.parent / (filepath.stem + inverse_key[filetype]))
+                return inverse_key[filetype], filepath.parent.parent / (filepath.stem + inverse_key[filetype]) / (filepath.stem + inverse_key[filetype])
             else:
                 print(TypeError(f'Wrong filetype: {filetype} is not in the inverse key.'))
-                return None, None
+                return extension, filepath
 
         # elif extension.lower() in built_in_key:
             # filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
@@ -422,20 +436,20 @@ def verify_file_type(filepath):
 
         else:
             print(TypeError(f'Wrong filetype: {extension} is not valid.'))
-            return None, None
+            return extension, filepath
     else:
         # this is when the file extension is correct
-        if built_in_key[extension.lower()] == filetype:
-            return built_in_key[filetype], filepath
+        if built_in_key[extension] == filetype:
+            return extension, filepath
         else:
             # if the file isn't binary
-            if filetype != 'application/octet-stream':
-                newPath = filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
-
+            if filetype in inverse_key:
+                filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
+                filepath.parent.rename(filepath.parent.parent / (filepath.stem + inverse_key[filetype]))
                 # new_name = filepath.parent / (filepath.stem + inverse_key[filetype])
-                return inverse_key[filetype], newPath
+                return inverse_key[filetype], filepath.parent.parent / (filepath.stem + inverse_key[filetype]) / (filepath.stem + inverse_key[filetype])
             else:
-                return None, None
+                return extension, filepath
 
 
 built_in_key = {".doc" :  "application/msword",
