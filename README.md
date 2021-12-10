@@ -8,11 +8,11 @@ Each file is a container that may contain more than one file. This allows Tirami
 
 | Features | Implemented? | Deadline |
 | --------------- | --------------- | --------------- |
-| Unzip & de-folder files | Yes | --  |
-| Serialize structure for future reads| Yes | -- |
+| Unzip & de-folder files | Yes | 12/01/21  |
+| Serialize structure for future reads| Yes | 12/09/21 |
 | Correcting file extensions| No | 12/10/21 |
-| Saving file hashes| No | 12/10/21 |
-| Locking files read-only| No | 12/10/21 |
+| Saving file hashes| Yes | 12/10/21 |
+| Locking files read-only| Yes | 12/10/21 |
 | Digest the oldest archive files| No | 12/10/21 |
 | Speed tests and benchmarks | No | 12/12/21
 | Integrate splitting pages & converting PDFs to images | No | 12/14/21 |

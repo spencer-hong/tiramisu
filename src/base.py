@@ -4,7 +4,8 @@ from shutil import copy, rmtree
 from layer import Layer
 from zipfile import ZipFile
 import pandas as pd
-# from magic import from_file
+from utils import generate_hash
+from magic import from_file
 
 class Base:
     def __init__(self, baseDir, description=None):
@@ -82,9 +83,8 @@ class Base:
                                           'fileExtension': '.folder', 'originalName': file.name,
                                           'originalPath': file.as_posix(),
                                           'relativePath':  fileID,
-                                          'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()]}
-
-
+                                          'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
+                                          'hash': ''}
 
 
                 # create the folder at the base level
@@ -99,19 +99,27 @@ class Base:
                     pass
             # if the file is not a directory
             else:
+
+
+                copy_files(file, self.baseDir / 'base' / (
+                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder'),
+                           fileID)
+
+                extension, newFile = verify_file_type((self.baseDir / 'base' / (
+                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder') )/ fileID / fileID)
+
                 fileID = str(newID) + extension
                 # save it in the list of dictionary
                 file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
                                           'layer': 'base',
-                                          'fileExtension': extension, 'originalName': file.name,
-                                          'originalPath': file.as_posix(),
+                                          'fileExtension': extension, 'originalName': newFile.name,
+                                          'originalPath': newFile.as_posix(),
                                           'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
-                                          'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()]}
+                                          'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
+                                          'hash': generate_hash(newFile.as_posix())}
 
                 # copy the file from the source directory to the base/parent folder
-                copy_files(file, self.baseDir / 'base' / (
-                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder'),
-                           fileID)
+
 
 
             newID = self.generate_id()
@@ -166,28 +174,31 @@ class Base:
                             newID = self.generate_id()
                 extension = file.suffix.lower()
 
+                extension, newFile = verify_file_type(file)
+
                 if extension == '.zip':
                     file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
                                               'layer': 'base',
-                                              'fileExtension': extension, 'originalName': file.name,
-                                              'originalPath': file.as_posix(),
+                                              'fileExtension': extension, 'originalName': newFile.name,
+                                              'originalPath': newFile.as_posix(),
                                               'relativePath': (str(newID) + '.zip'),
                                               'parentID': container_ids[
-                                                  file.relative_to(extractDir).parent.as_posix()]}
+                                                  file.relative_to(extractDir).parent.as_posix()],
+                                              'hash': generate_hash(newFile.as_posix())}
                     # add the zip file to the ongoing zipList
-                    zipList.append((newID, file.as_posix()))
+                    zipList.append((newID, newFile.as_posix()))
 
                     # if the zipfile fileID is same as the fileID of the parent folder that contains the zipFile
                     # copy the zip file into the .zip folder
                     if zipList[0][0] == container_ids[file.relative_to(extractDir).parent.as_posix()]:
-                        copy_files(file, self.baseDir / 'base' / (
+                        copy_files(newFile, self.baseDir / 'base' / (
                                 str(container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.zip'),
                                    str(newID) + extension)
 
                     # when file's parents is not at the root of the zip file, but some other folder.
                     # copy the file into a .folder folder, not a .zip folder.
                     else:
-                        copy_files(file, self.baseDir / 'base' / (
+                        copy_files(newFile, self.baseDir / 'base' / (
                                 str(container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.folder'),
                                    str(newID) + extension)
 
@@ -202,7 +213,8 @@ class Base:
                                               'originalPath': file.as_posix(),
                                               'relativePath': temp_id,
                                               'parentID': container_ids[
-                                                  file.relative_to(extractDir).parent.as_posix()]}
+                                                  file.relative_to(extractDir).parent.as_posix()],
+                                              'hash': ''}
 
                     # again check, if the immediate parent of the folder is at the root of a zip file
                     # if so, save the .folder file in the .zip folder
@@ -224,36 +236,39 @@ class Base:
                     # since the "root" of the file is at the root of the zip file
                     if file.relative_to(extractDir).parent.as_posix() == '.':
                         file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
-                                                  'layer': 'base', 'fileExtension': extension, 'originalName': file.name,
-                                                  'originalPath': file.as_posix(),
+                                                  'layer': 'base', 'fileExtension': extension, 'originalName': newFile.name,
+                                                  'originalPath': newFile.as_posix(),
                                                   'relativePath': (Path(str(
                                                       container_ids[
                                                           file.relative_to(
                                                               extractDir).parent.as_posix()]) + '.zip') / (
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
-                                                      file.relative_to(extractDir).parent.as_posix()]}
-                        copy_files(file, self.baseDir / 'base' / (str(
+                                                      file.relative_to(extractDir).parent.as_posix()],
+                                                  'hash': generate_hash(file.as_posix())}
+
+                        copy_files(newFile, self.baseDir / 'base' / (str(
                             container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.zip'),
                                    str(newID) + extension)
 
                     # if not, copy the file to a .folder folder
                     else:
                         file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
-                                                  'layer': 'base','fileExtension': extension, 'originalName': file.name,
-                                                  'originalPath': file.as_posix(),
+                                                  'layer': 'base','fileExtension': extension, 'originalName': newFile.name,
+                                                  'originalPath': newFile.as_posix(),
                                                   'relativePath': (Path(str(
                                                       container_ids[
                                                           file.relative_to(
                                                               extractDir).parent.as_posix()]) + '.folder') / (
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
-                                                      file.relative_to(extractDir).parent.as_posix()]}
+                                                      file.relative_to(extractDir).parent.as_posix()],
+                                                  'hash': generate_hash(file.as_posix())}
 
                         if zipList[0][0] == container_ids[file.relative_to(extractDir).parent.as_posix()]:
                            raise ValueError('this should never be run here if the logic follows')
                         else:
-                            copy_files(file, self.baseDir / 'base' / (str(
+                            copy_files(newFile, self.baseDir / 'base' / (str(
                                 container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.folder'),
                                        str(newID) + extension)
 
@@ -280,9 +295,7 @@ class Base:
 
         self.update_metadata()
 
-    # requires the two dictionaries from prepare_files()
     def set_files(self, layerName):
-        # self.baseFiles = self.database.sort_values('containerID').iloc[-1]['containerID'] + 1
         ids = {}
         counter = 0
         layerPath = self.baseDir / layerName
@@ -294,21 +307,8 @@ class Base:
                                 'fileExtension': file.suffix, 'originalName': file.name, 'name': file.parent.name,
                                 'originalPath': file.parent.as_posix(),
                                 'relativePath': file.parent.relative_to(layerPath).as_posix(),
-                                'parentID': int(file.parent.parent.stem)}
-            # children = get_all_files(layerPath / file)
-            # # for parent in file.relative_to(layer_path).parents:
-            # # 	if parent.as_posix() != '.':
-            #
-            # for child in children:
-            #     if child.is_dir():
-            #         subChildren = get_all_files(child)
-            #         for subChild in subChildren:
-            #             ids[counter] = {'containerID': int(child.stem), 'filePhase': filephaseDict[file],
-            #                     'layer': layerName,
-            #                     'fileExtension': child.suffix, 'originalName': subChild.name,'name': child.name,
-            #                     'originalPath': subChild.as_posix(),
-            #                     'relativePath': subChild.relative_to(layerPath).as_posix(),
-            #                     'parentID': int(file.split('.')[0])}
+                                'parentID': int(file.parent.parent.stem),
+                                'hash': generate_hash(file.as_posix())}
 
             counter += 1
 
@@ -361,32 +361,12 @@ class Base:
         self.baseFiles = new_id
 
         return new_id
-        # if len(self.baseFiles) == 0:
-        #     self.baseFiles.append(0)
-        #     return 0
-        # else:
-        #     new_id = sorted(self.baseFiles)[-1] + 1
-        #
-        #     self.baseFiles.append(new_id)
-        #     return new_id
+
 
     def prepare_folders(self, fileList, layerName):
         for file in fileList:
             make_folder(self.baseDir / layerName, file)
-    # def prepare_files(self, fileList, layerName):
-    #
-    #     filePhaseDict = {}
-    #     idDict ={}
-    #     for file in fileList:
-    #         filePhase = self.return_file_phase(file)
-    #         newFilePhase = filePhase + 1
-    #
-    #         newID = self.generate_id()
-    #
-    #         filePhaseDict[file] = newFilePhase
-    #         idDict[file] = newID
-    #
-    #     return filePhaseDict, idDict
+
 
 
 def get_all_files(directory):
@@ -412,6 +392,152 @@ def make_folder(file_dir, name):
 def remove_folder(directory):
     rmtree(directory)
 
+
+# filepath must be a Pathlib object
+def verify_file_type(filepath):
+    filename = filepath.name
+
+    if len(filename.split('.')) == 1:
+        extension = ''
+    else:
+        # assert len(filename.split('.')) == 2
+        extension = '.' + filename.split('.')[-1]
+    filetype = from_file(filepath, mime=True)
+    new_name = None
+    if extension.lower() not in built_in_key:
+        if extension == '':
+            if filetype in inverse_key:
+                newPath = filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
+                # new_name = filepath.parent / (filepath.stem + inverse_key[filetype])
+                return inverse_key[filetype], newPath
+            else:
+                print(TypeError(f'Wrong filetype: {filetype} is not in the inverse key.'))
+                return None, None
+
+        # elif extension.lower() in built_in_key:
+            # filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
+            # os.rename(filepath, os.path.join(os.path.dirname(filepath), Path(filename).stem + inverse_key[filetype]))
+            # new_name = Path(filepath).parent / (Path(filename).stem + inverse_key[filetype])
+            # return filetype, new_name
+
+        else:
+            print(TypeError(f'Wrong filetype: {extension} is not valid.'))
+            return None, None
+    else:
+        # this is when the file extension is correct
+        if built_in_key[extension.lower()] == filetype:
+            return built_in_key[filetype], filepath
+        else:
+            # if the file isn't binary
+            if filetype != 'application/octet-stream':
+                newPath = filepath.rename(filepath.parent / filepath.stem + inverse_key[filetype])
+
+                # new_name = filepath.parent / (filepath.stem + inverse_key[filetype])
+                return inverse_key[filetype], newPath
+            else:
+                return None, None
+
+
+built_in_key = {".doc" :  "application/msword",
+    ".dot"   :  "application/msword",
+    ".docx"  :   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".dotx"  :   "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    ".docm"  :   "application/vnd.ms-word.document.macroEnabled.12",
+    ".dotm"  :   "application/vnd.ms-word.template.macroEnabled.12",
+    ".xls"   : "application/vnd.ms-excel",
+    ".xlt"   :  "application/vnd.ms-excel",
+    ".xla"   :  "application/vnd.ms-excel",
+    ".xlsx"  :   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xltx"  :   "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    ".xlsm"  :   "application/vnd.ms-excel.sheet.macroEnabled.12",
+    ".xltm"  :   "application/vnd.ms-excel.template.macroEnabled.12",
+    ".xlam"  :   "application/vnd.ms-excel.addin.macroEnabled.12",
+    ".xlsb"  :   "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+    ".ppt"   :"application/vnd.ms-powerpoint",
+    ".pot"   :  "application/vnd.ms-powerpoint",
+    ".pps"   :  "application/vnd.ms-powerpoint",
+    ".ppa"   :  "application/vnd.ms-powerpoint",
+    ".pptx"  :   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".potx"  :   "application/vnd.openxmlformats-officedocument.presentationml.template",
+    ".ppsx"  :   "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+    ".ppam"  :   "application/vnd.ms-powerpoint.addin.macroEnabled.12",
+    ".pptm"  :   "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+    ".potm"  :   "application/vnd.ms-powerpoint.template.macroEnabled.12",
+    ".ppsm"  :   "application/vnd.ms-powerpoint.slideshow.macroEnabled.12",
+    ".mdb"   : "application/vnd.ms-access",
+    ".csv" :   "text/csv",
+    ".gz": "application/gzip",
+    ".gif": "image/gif",
+    ".html": "text/html",
+    ".htm" : "text/html",
+    ".jpeg": "image/jpeg",
+    ".jpg" : "image/jpg",
+    ".json": "application/json",
+    ".mp4": "video/mp4",
+    ".mpeg": "video/mpeg",
+    ".mp3": "audio/mpeg",
+    ".png": "image/png",
+    ".pdf": "application/pdf",
+    ".rar": "application/vnd.rar",
+    ".rtf": "application/rtf",
+    ".svg": "image/svg+xml",
+    ".tar": "application/x-tar",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".txt": "text/plain",
+    ".webp": "image/webp",
+    ".xml": "application/xml",
+    ".zip": "application/zip",
+    ".7z": "application/x-7z-compressed",
+    ".tar.xz": "application/x-xz",
+    ".gzip" : "application/gzip"
+    }
+
+inverse_key = {"application/msword" : ".doc",
+"application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".docx" ,
+"application/vnd.openxmlformats-officedocument.wordprocessingml.template" : ".dotx" ,
+"application/vnd.ms-word.document.macroEnabled.12" : ".docm",
+"application/vnd.ms-word.template.macroEnabled.12" : ".dotm",
+"application/vnd.ms-excel" : ".xls",
+"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+"application/vnd.openxmlformats-officedocument.spreadsheetml.template" : ".xltx",
+"application/vnd.ms-excel.sheet.macroEnabled.12" : ".xlsm" ,
+"application/vnd.ms-excel.template.macroEnabled.12" : ".xltm",
+"application/vnd.ms-excel.addin.macroEnabled.12" : ".xlam",
+"application/vnd.ms-excel.sheet.binary.macroEnabled.12" : ".xlsb" ,
+"application/vnd.ms-powerpoint" : ".ppt",
+"application/vnd.openxmlformats-officedocument.presentationml.presentation" : ".pptx",
+"application/vnd.openxmlformats-officedocument.presentationml.template" :  ".potx",
+"application/vnd.openxmlformats-officedocument.presentationml.slideshow" : ".ppsx",
+"application/vnd.ms-powerpoint.addin.macroEnabled.12": ".ppam",
+"application/vnd.ms-powerpoint.presentation.macroEnabled.12" : "pptm",
+"application/vnd.ms-powerpoint.template.macroEnabled.12" : "potm",
+"application/vnd.ms-powerpoint.slideshow.macroEnabled.12": "ppsm",
+"application/vnd.ms-access": ".mdb",
+"text/csv" : ".csv",
+"application/gzip" : ".gz",
+"image/gif" : ".gif",
+"text/html" : ".html",
+"image/jpeg" : '.jpeg',
+"application/json" : '.json',
+"video/mp4" : ".mp4",
+"video/mpeg" : ".mpeg",
+"audio/mpeg" : ".mp3",
+"image/png" : ".png",
+"application/pdf" : ".pdf",
+"application/vnd.rar" : ".rar",
+"application/rtf" : ".rtf",
+"image/svg+xml" : ".svg",
+"application/x-tar" : ".tar",
+"image/tiff" : ".tiff",
+"text/plain" : ".txt",
+"text/rtf": ".rtf",
+"image/webp" : ".webp",
+"application/xml" : ".xml",
+"application/zip" : ".zip",
+"application/x-7z-compressed" : ".7z",
+"application/x-xz" : ".tar.xz"
+}
 
 if __name__ == '__main__':
     fake_folder_with_files = '/Users/spencerhong/Downloads/test_folder/'
