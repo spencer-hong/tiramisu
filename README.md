@@ -13,14 +13,25 @@ Each file is a container that may contain more than one file. This allows Tirami
 | Correcting file extensions| Yes | 12/10/21 |
 | Saving file hashes| Yes | 12/10/21 |
 | Locking files read-only| Yes | 12/10/21 |
-| Digest the oldest archive files| No | 12/10/21 |
-| Speed tests and benchmarks | No | 12/12/21
+| Digest the oldest archive files| Yes | 12/10/21 |
+| Speed tests and benchmarks | Yes | 12/12/21 |
+| Create parent-child descendancy table | Yes  | 12/13/21 |
 | Integrate splitting pages & converting PDFs to images | No | 12/14/21 |
 | Integrate splitting of PDF files to pages | No | 12/20/21 | 
 | Digest the newest archive files | No | 12/24/21 |
 | Obtain archive statistics | No | 01/04/22 |
 | Create examples for GitHub repo | No | 01/05/22 |
 | Figure out how to modify label studio with tiramisu | No | 01/05/22 |
+
+
+
+## Installation
+
+Tiramisu depends on Pandas and python-magic. To install python-magic,  
+`brew install libmagic` for OSX   
+`sudo apt-get install libmagic1` for Linux  
+
+then follow with `pip install python-magic`
 
 ## Known limitations  
 
