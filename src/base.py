@@ -115,11 +115,12 @@ class Base:
                         str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder')) / fileID / fileID)
 
                 lock_files_read_only(newFile)
+
                 # save it in the list of dictionary
                 file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': newID + extension,
                                           'layer': 'base',
-                                          'fileExtension': extension, 'originalName': newFile.name,
-                                          'originalPath': newFile.as_posix(),
+                                          'fileExtension': extension, 'originalName': file.name,
+                                          'originalPath': file.as_posix(),
                                           'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
                                           'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
                                           'hash': generate_hash(newFile.as_posix())}
@@ -295,15 +296,18 @@ class Base:
 
     #this function must be run before prepare_files()
     # pipelineID should be integer
-    def set_layer(self, layerName, layerDescription, pipelineID):
+    def set_layer(self, layerName, layerDescription, pipelineID, fileList):
 
         assert (self.baseDir / layerName).exists() == False
+        assert not (layerName in self.layers )
 
         make_folder(self.baseDir, layerName)
 
         self.layers.append(layerName)
         tempLayer = Layer(layerName, layerDescription, pipelineID, self.baseDir / layerName)
         tempLayer.update_metadata()
+
+        self.prepare_folders(fileList, layerName)
 
         self.update_metadata()
 
@@ -313,7 +317,8 @@ class Base:
         layerPath = self.baseDir / layerName
         allFiles = get_all_files(layerPath)
         for file in allFiles:
-            if not file.is_dir() and file.name != 'metadata.json':
+
+            if not file.is_dir() and not (file.name  in ['metadata.json', 'database.parquet']):
                 ids[counter] = {'containerID': file.parent.stem, 'filePhase': self.return_file_phase(file.parent.parent.name) + 1,
                                 'layer': layerName,
                                 'fileExtension': file.suffix, 'originalName': file.name, 'name': file.parent.name,
@@ -328,12 +333,18 @@ class Base:
 
         self.dump_database()
 
+    def load_layer(self, layerName):
+
+        with open(self.baseDir/ layerName/'metadata.json', 'r') as f:
+            metadata = json.load(f)
+        return Layer(layerName, metadata['description'], metadata['pipelineID'], metadata['layerDirectory'])
+
     # file is the file name (with extension)
     # this returns the immediate parent, not all parents.
     def return_file_parent(self, file=None):
-
         if file != None:
             ID = file.split('.')[0]
+
             return self.database.loc[self.database.containerID == ID].sort_values('filePhase').iloc[-1]['filePhase']
         else:
             return self.database.loc[self.database.containerID == file].sort_values('filePhase').iloc[-1].set_index(
@@ -352,7 +363,6 @@ class Base:
         self.database.containerID = self.database.containerID.astype(str)
         self.database.parentID = self.database.parentID.astype(str)
 
-        bp()
         self.database.to_parquet( self.baseDir / 'database.parquet')
     def read_database(self):
         self.database = pd.read_parquet(self.baseDir/'database.parquet')
