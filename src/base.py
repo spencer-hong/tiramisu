@@ -7,15 +7,18 @@ import pandas as pd
 from utils import generate_hash, lock_files_read_only
 from magic import from_file
 from uuid import uuid4
+import numpy as np 
 from random import randrange
+from datetime import datetime
 from pdb import set_trace as bp
+from os.path import getmtime
 
 class Base:
     def __init__(self, baseDir, description=None):
         if (Path(baseDir) / 'base' / 'metadata.json').is_file():
             with open((Path(baseDir) / 'base' / 'metadata.json').as_posix(), 'r') as f:
                 metadata = json.load(f)
-            self.baseDir = Path(baseDir)
+            self.baseDir = Path(baseDir).resolve()
             self.description = metadata['description']
             self.database = self.read_database()
             self.layers = metadata['layers']
@@ -47,11 +50,11 @@ class Base:
         newID = self.generate_id()
 
         # first container is always the root container
-        file_df_saved[0] = {'containerID': newID, 'filePhase': 0, 'layer': 'base',
+        file_df_saved[0] = {'containerID': newID, 'filePhase': 0, 'name': newID + '.folder', 'layer': 'base',
                                   'fileExtension': '.folder', 'originalName': 'root',
                                   'originalPath': fileDir,
-                                  'relativePath': '0.folder',
-                                  'parentID': '0', 'hash': ''}
+                                  'relativePath': newID + '.folder',
+                                  'parentID': newID, 'hash': '', 'time': datetime.now()}
         container_ids['.'] = 0
 
 
@@ -85,7 +88,8 @@ class Base:
                                           'originalPath': file.as_posix(),
                                           'relativePath':  fileID,
                                           'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
-                                          'hash': ''}
+                                          'hash': '',
+                                          'time': datetime.now()}
 
 
                 # create the folder at the base level
@@ -123,7 +127,8 @@ class Base:
                                           'originalPath': file.as_posix(),
                                           'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
                                           'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
-                                          'hash': generate_hash(newFile.as_posix())}
+                                          'hash': generate_hash(newFile.as_posix()),
+                                          'time': datetime.now()}
 
                 # copy the file from the source directory to the base/parent folder
 
@@ -195,7 +200,8 @@ class Base:
                                               'relativePath': (newID + '.zip'),
                                               'parentID': container_ids[
                                                   file.relative_to(extractDir).parent.as_posix()],
-                                              'hash': generate_hash(newFile.as_posix())}
+                                              'hash': generate_hash(newFile.as_posix()),
+                                              'time': datetime.now()}
                     # add the zip file to the ongoing zipList
                     zipList.append((newID, newFile.as_posix()))
 
@@ -226,7 +232,8 @@ class Base:
                                               'relativePath': temp_id,
                                               'parentID': container_ids[
                                                   file.relative_to(extractDir).parent.as_posix()],
-                                              'hash': ''}
+                                              'hash': '',
+                                              'time': datetime.now()}
 
                     # again check, if the immediate parent of the folder is at the root of a zip file
                     # if so, save the .folder file in the .zip folder
@@ -257,7 +264,8 @@ class Base:
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
                                                       file.relative_to(extractDir).parent.as_posix()],
-                                                  'hash': generate_hash(file.as_posix())}
+                                                  'hash': generate_hash(file.as_posix()),
+                                                  'time': datetime.now()}
 
                         copy_files(newFile, self.baseDir / 'base' / (str(
                             container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.zip'),
@@ -275,7 +283,8 @@ class Base:
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
                                                       file.relative_to(extractDir).parent.as_posix()],
-                                                  'hash': generate_hash(file.as_posix())}
+                                                  'hash': generate_hash(file.as_posix()),
+                                                  'time': datetime.now()}
 
                         if zipList[0][0] == container_ids[file.relative_to(extractDir).parent.as_posix()]:
                            raise ValueError('this should never be run here if the logic follows')
@@ -325,10 +334,10 @@ class Base:
                                 'originalPath': file.parent.as_posix(),
                                 'relativePath': file.parent.relative_to(layerPath).as_posix(),
                                 'parentID': file.parent.parent.stem,
-                                'hash': generate_hash(file.as_posix())}
+                                'hash': generate_hash(file.as_posix()),
+                                'time': getmtime(file)}
 
             counter += 1
-
         self.database = pd.concat([self.database, pd.DataFrame.from_dict(ids, orient='index')], ignore_index=True)
 
         self.dump_database()
@@ -397,138 +406,138 @@ class Base:
             make_folder(self.baseDir / layerName, file)
 
     def return_parent_child_table(self):
-        return list_ancestors(self.database[['containerID', 'parentID']].iloc[1:].values)
 
-    def list_ancestors(edges):
-        """
-        Take edge list of a rooted tree as a numpy array with shape (E, 2),
-        child nodes in edges[:, 0], parent nodes in edges[:, 1]
-        Return pandas dataframe of all descendant/ancestor node pairs
+        def list_ancestors(edges):
+            """
+            Take edge list of a rooted tree as a numpy array with shape (E, 2),
+            child nodes in edges[:, 0], parent nodes in edges[:, 1]
+            Return pandas dataframe of all descendant/ancestor node pairs
 
-        Ex:
-            df = pd.DataFrame({'child': [200, 201, 300, 301, 302, 400],
-                               'parent': [100, 100, 200, 200, 201, 300]})
+            Ex:
+                df = pd.DataFrame({'child': [200, 201, 300, 301, 302, 400],
+                                   'parent': [100, 100, 200, 200, 201, 300]})
 
-            df
-               child  parent
-            0    200     100
-            1    201     100
-            2    300     200
-            3    301     200
-            4    302     201
-            5    400     300
+                df
+                   child  parent
+                0    200     100
+                1    201     100
+                2    300     200
+                3    301     200
+                4    302     201
+                5    400     300
 
-            list_ancestors(df.values)
+                list_ancestors(df.values)
 
-            returns
+                returns
 
-                descendant  ancestor
-            0          200       100
-            1          201       100
-            2          300       200
-            3          300       100
-            4          301       200
-            5          301       100
-            6          302       201
-            7          302       100
-            8          400       300
-            9          400       200
-            10         400       100
-        """
-        ancestors = []
-        for ar in trace_nodes(edges):
-            ancestors.append(np.c_[np.repeat(ar[:, 0], ar.shape[1] - 1),
-                                   ar[:, 1:].flatten()])
-        return pd.DataFrame(np.concatenate(ancestors),
-                            columns=['child', 'parent'])
+                    descendant  ancestor
+                0          200       100
+                1          201       100
+                2          300       200
+                3          300       100
+                4          301       200
+                5          301       100
+                6          302       201
+                7          302       100
+                8          400       300
+                9          400       200
+                10         400       100
+            """
+            ancestors = []
+            for ar in trace_nodes(edges):
+                ancestors.append(np.c_[np.repeat(ar[:, 0], ar.shape[1] - 1),
+                                       ar[:, 1:].flatten()])
+            return pd.DataFrame(np.concatenate(ancestors),
+                                columns=['child', 'parent'])
 
-    def trace_nodes(edges):
-        """
-        Take edge list of a rooted tree as a numpy array with shape (E, 2),
-        child nodes in edges[:, 0], parent nodes in edges[:, 1]
-        Yield numpy array with cross-section of tree and associated
-        ancestor nodes
+        def trace_nodes(edges):
+            """
+            Take edge list of a rooted tree as a numpy array with shape (E, 2),
+            child nodes in edges[:, 0], parent nodes in edges[:, 1]
+            Yield numpy array with cross-section of tree and associated
+            ancestor nodes
 
-        Ex:
-            df = pd.DataFrame({'child': [200, 201, 300, 301, 302, 400],
-                               'parent': [100, 100, 200, 200, 201, 300]})
+            Ex:
+                df = pd.DataFrame({'child': [200, 201, 300, 301, 302, 400],
+                                   'parent': [100, 100, 200, 200, 201, 300]})
 
-            df
-               child  parent
-            0    200     100
-            1    201     100
-            2    300     200
-            3    301     200
-            4    302     201
-            5    400     300
+                df
+                   child  parent
+                0    200     100
+                1    201     100
+                2    300     200
+                3    301     200
+                4    302     201
+                5    400     300
 
-            trace_nodes(df.values)
+                trace_nodes(df.values)
 
-            yields
+                yields
 
-            array([[200, 100],
-                   [201, 100]])
+                array([[200, 100],
+                       [201, 100]])
 
-            array([[300, 200, 100],
-                   [301, 200, 100],
-                   [302, 201, 100]])
+                array([[300, 200, 100],
+                       [301, 200, 100],
+                       [302, 201, 100]])
 
-            array([[400, 300, 200, 100]])
-        """
-        mask = np.in1d(edges[:, 1], edges[:, 0])
-        gen_branches = edges[~mask]
-        edges = edges[mask]
-        yield gen_branches
-        while edges.size != 0:
+                array([[400, 300, 200, 100]])
+            """
             mask = np.in1d(edges[:, 1], edges[:, 0])
-            next_gen = edges[~mask]
-            gen_branches = numpy_col_inner_many_to_one_join(next_gen, gen_branches)
+            gen_branches = edges[~mask]
             edges = edges[mask]
             yield gen_branches
+            while edges.size != 0:
+                mask = np.in1d(edges[:, 1], edges[:, 0])
+                next_gen = edges[~mask]
+                gen_branches = numpy_col_inner_many_to_one_join(next_gen, gen_branches)
+                edges = edges[mask]
+                yield gen_branches
 
-    def numpy_col_inner_many_to_one_join(ar1, ar2):
-        """
-        Take two 2-d numpy arrays ar1 and ar2,
-        with no duplicate values in first column of ar2
-        Return inner join of ar1 and ar2 on
-        last column of ar1, first column of ar2
+        def numpy_col_inner_many_to_one_join(ar1, ar2):
+            """
+            Take two 2-d numpy arrays ar1 and ar2,
+            with no duplicate values in first column of ar2
+            Return inner join of ar1 and ar2 on
+            last column of ar1, first column of ar2
 
-        Ex:
+            Ex:
 
-            ar1 = np.array([[1,  2,  3],
-                            [4,  5,  3],
-                            [6,  7,  8],
-                            [9, 10, 11]])
+                ar1 = np.array([[1,  2,  3],
+                                [4,  5,  3],
+                                [6,  7,  8],
+                                [9, 10, 11]])
 
-            ar2 = np.array([[ 1,  2],
-                            [ 3,  4],
-                            [ 5,  6],
-                            [ 7,  8],
-                            [ 9, 10],
-                            [11, 12]])
+                ar2 = np.array([[ 1,  2],
+                                [ 3,  4],
+                                [ 5,  6],
+                                [ 7,  8],
+                                [ 9, 10],
+                                [11, 12]])
 
-            numpy_col_inner_many_to_one_join(ar1, ar2)
+                numpy_col_inner_many_to_one_join(ar1, ar2)
 
-            returns
+                returns
 
-            array([[ 1,  2,  3,  4],
-                   [ 4,  5,  3,  4],
-                   [ 9, 10, 11, 12]])
-        """
+                array([[ 1,  2,  3,  4],
+                       [ 4,  5,  3,  4],
+                       [ 9, 10, 11, 12]])
+            """
 
-        ar1 = ar1[np.in1d(ar1[:, -1], ar2[:, 0])]
-        ar2 = ar2[np.in1d(ar2[:, 0], ar1[:, -1])]
+            ar1 = ar1[np.in1d(ar1[:, -1], ar2[:, 0])]
+            ar2 = ar2[np.in1d(ar2[:, 0], ar1[:, -1])]
 
-        if 'int' in ar1.dtype.name and ar1[:, -1].min() >= 0:
-            bins = np.bincount(ar1[:, -1])
-            counts = bins[bins.nonzero()[0]]
-        else:
-            counts = np.unique(ar1[:, -1], False, False, True)[1]
-        left = ar1[ar1[:, -1].argsort()]
-        right = ar2[ar2[:, 0].argsort()]
-        return np.concatenate([left[:, :-1],
-                               right[np.repeat(np.arange(right.shape[0]),
-                                               counts)]], 1)
+            if 'int' in ar1.dtype.name and ar1[:, -1].min() >= 0:
+                bins = np.bincount(ar1[:, -1])
+                counts = bins[bins.nonzero()[0]]
+            else:
+                counts = np.unique(ar1[:, -1], False, False, True)[1]
+            left = ar1[ar1[:, -1].argsort()]
+            right = ar2[ar2[:, 0].argsort()]
+            return np.concatenate([left[:, :-1],
+                                   right[np.repeat(np.arange(right.shape[0]),
+                                                   counts)]], 1)
+        return list_ancestors(self.database[['containerID', 'parentID']].iloc[1:].values)
 
 
 
