@@ -108,29 +108,33 @@ class Base:
 
 
                 fileID = newID + extension
+                # only copy file if it's not a binary file
+                filetype = from_file(file.as_posix(), mime=True)
+                if filetype != 'application/octet-stream':
+                    copy_files(file, self.baseDir / 'base' / (
+                            str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder'),
+                               fileID)
 
-                copy_files(file, self.baseDir / 'base' / (
-                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder'),
-                           fileID)
+                    extension, newFile = verify_file_type((self.baseDir / 'base' / (
+                            str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder')) / fileID / fileID)
 
+                if newFile != None and extension != None:
+                    lock_files_read_only(newFile)
 
+                # important to keep this here
+                fileID = newID + extension
+                if extension != None and newFile != None:
+                    # save it in the list of dictionary
+                    file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': newID + extension,
+                                              'layer': 'base',
+                                              'fileExtension': extension, 'originalName': file.name,
+                                              'originalPath': file.as_posix(),
+                                              'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
+                                              'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
+                                              'hash': generate_hash(newFile.as_posix()),
+                                              'time': datetime.now()}
 
-                extension, newFile = verify_file_type((self.baseDir / 'base' / (
-                        str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder')) / fileID / fileID)
-
-                lock_files_read_only(newFile)
-
-                # save it in the list of dictionary
-                file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': newID + extension,
-                                          'layer': 'base',
-                                          'fileExtension': extension, 'originalName': file.name,
-                                          'originalPath': file.as_posix(),
-                                          'relativePath': str(container_ids[file.relative_to(fileDir).parent.as_posix()]) + '.folder/' + fileID,
-                                          'parentID': container_ids[file.relative_to(fileDir).parent.as_posix()],
-                                          'hash': generate_hash(newFile.as_posix()),
-                                          'time': datetime.now()}
-
-                # copy the file from the source directory to the base/parent folder
+                    # copy the file from the source directory to the base/parent folder
 
 
 
@@ -189,8 +193,8 @@ class Base:
 
                 if file.is_file():
                     extension, newFile = verify_file_type(file)
-
-                    lock_files_read_only(newFile)
+                    if extension != None and newFile != None:
+                        lock_files_read_only(newFile)
                 if extension == '.zip':
 
                     file_df_saved[counter] = {'containerID': newID, 'filePhase': 0, 'name': str(newID) + extension,
@@ -249,7 +253,7 @@ class Base:
                                   'w') as f:
                             pass
                 # if the file is not a directory and not a zip file
-                else:
+                elif newFile != None and extension != None:
 
                     # if the file is at the root folder, the file must be copied into the .zip file
                     # since the "root" of the file is at the root of the zip file
@@ -264,7 +268,7 @@ class Base:
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
                                                       file.relative_to(extractDir).parent.as_posix()],
-                                                  'hash': generate_hash(file.as_posix()),
+                                                  'hash': generate_hash(newFile.as_posix()),
                                                   'time': datetime.now()}
 
                         copy_files(newFile, self.baseDir / 'base' / (str(
@@ -283,7 +287,7 @@ class Base:
                                                                            str(newID) + extension)).as_posix(),
                                                   'parentID': container_ids[
                                                       file.relative_to(extractDir).parent.as_posix()],
-                                                  'hash': generate_hash(file.as_posix()),
+                                                  'hash': generate_hash(newFile.as_posix()),
                                                   'time': datetime.now()}
 
                         if zipList[0][0] == container_ids[file.relative_to(extractDir).parent.as_posix()]:
@@ -292,7 +296,10 @@ class Base:
                             copy_files(newFile, self.baseDir / 'base' / (str(
                                 container_ids[file.relative_to(extractDir).parent.as_posix()]) + '.folder'),
                                        str(newID) + extension)
-
+                else:
+                    # this is where binary files would go
+                    # do nothing
+                    pass
 
                 newID = self.generate_id()
                 counter += 1
@@ -576,8 +583,11 @@ def verify_file_type(filepath):
         extension = extension.lower()
     filetype = from_file(filepath.as_posix(), mime=True)
     new_name = None
+
     if extension not in built_in_key:
-        if extension == '':
+        if filetype == 'application/octet-stream':
+            return None, None
+        elif extension == '':
             if filetype in inverse_key:
                 filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
                 # new_name = filepath.parent / (filepath.stem + inverse_key[filetype])
@@ -592,7 +602,11 @@ def verify_file_type(filepath):
             return extension, filepath
     else:
         # this is when the file extension is correct
-        if built_in_key[extension] == filetype:
+
+        # ignore binary files
+        if filetype == 'application/octet-stream':
+            return None, None
+        elif built_in_key[extension] == filetype:
             return extension, filepath
         else:
             # if the file isn't binary
