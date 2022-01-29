@@ -49,28 +49,32 @@ class Base:
 		# this is where the /hierarchy, /files and /databases will live
 
 
-
-		self.baseDir = Path(baseDir).resolve()
-
+		self.baseDir = Path(baseDir)
 		try:
 			assert (self.baseDir).exists()
 		except:
-			self.baseDir.mkdir(parents = False)
+			print('folder doesnt exist!')
+
+
+		(self.baseDir / '.tiramisu').mkdir()
+
+		self.baseDir  = (self.baseDir / '.tiramisu').resolve()
 
 		self.description = description
 
 		# self.pipelineIDs = []
 
 		if blackList == None:
-			self.blackList = ['.git']
+			self.blackList = ['.git', '.gitignore']
 		elif '.git' in blackList:
 			self.blackList = blackList
 		else:
 			self.blackList = blackList.append('.git')
+			self.blackList = blackList.append('.gitignore')
 
 		self.name = name
 		try:
-			self.repo = git.Repo(self.baseDir)
+			self.repo = git.Repo(self.baseDir.parent)
 
 			with open(self.baseDir / 'baseMetadata.yaml', 'r') as f:
 				try:
@@ -83,11 +87,7 @@ class Base:
 
 			assert (self.baseDir / 'files').exists() == True
 
-			assert (self.baseDir / 'databases').exists() == True
-
-			# self.pipelineIDs = self.baseMetadata['_pipelineIDs']
-
-			# self.database = pd.read_parquet(self.baseDir / 'databases' / 'main.parquet')
+			assert (self.baseDir /  'databases').exists() == True
 
 		except git.exc.InvalidGitRepositoryError:
 
@@ -107,15 +107,13 @@ class Base:
 
 			(self.baseDir / 'files').mkdir(parents = False)
 			(self.baseDir / 'databases').mkdir(parents = False)
-			utils.write_gitignore(self.baseDir)
+			utils.write_gitignore(self.baseDir.parent)
 
-			self.repo = git.Repo.init(baseDir)
+			self.repo = git.Repo.init(self.baseDir.parent)
 
 			self.repo.git.add(all = True)
 
 			self.repo.index.commit('Preprocessing Base Layer. IGNORE.')
-
-			# self.database = None
 
 			# now ready for the first commit after digestion
 
@@ -157,6 +155,7 @@ class Base:
 			dirs[:] = [d for d in dirs if d not in self.blackList]
 			dirs[:] = [d for d in dirs if d not in repo.ignored(dirs)]
 			files[:] = [f for f in files if f not in repo.ignored(files)]
+			files[:] = [f for f in files if f not in self.blackList]
 			for directory in dirs:
 
 				
@@ -169,7 +168,7 @@ class Base:
 
 				rootTree.create_node( tag = directory, identifier = node_id,  data = node_id, parent = parent_id)
 
-				(self.baseDir / 'files'/ parent_id).mkdir()
+				(self.baseDir / 'files'/ parent_id).mkdir(exist_ok=True)
 
 				directory = Path(directory)
 
@@ -183,15 +182,16 @@ class Base:
 				# with open(tiramisuPath, 'w') as f:
 				# 	pass
 
-				tiramisuPath.symlink_to(targetPath)
-
-
+				try:
+					tiramisuPath.resolve().symlink_to(targetPath.resolve())
+				except:
+					bp()
 				# folderFiles.append(node_id+ '.folder')
 
 				file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 								  'fileExtension': '.folder',
 								  'originalPath': directory.resolve().as_posix(),
-								  'tiramisuPath': tiramisuPath.as_posix(),
+								  'tiramisuPath': targetPath.resolve().as_posix(),
 								  'parentID': parent_id, 'hash': '', 'time': datetime.now()}
 				counter += 1
 
@@ -211,16 +211,32 @@ class Base:
 
 				rootTree.create_node(tag = file.stem, identifier = node_id,  data = node_id, parent = parent_id)
 
-				(self.baseDir / 'files' / parent_id).mkdir()
+				(self.baseDir / 'files' / parent_id).mkdir(exist_ok=True)
 
 				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
 
-				utils.copy_files(root / file, tiramisuPath)
+				# utils.copy_files(root / file, tiramisuPath)
 
-				correctedFilePath = utils.verify_file_type(Path(tiramisuPath))
+				correctedFilePath = utils.verify_file_type(root / file)
+
+				if correctedFilePath != (root / file):
+
+					utils.copy_files((root / file), correctedFilePath)
+
+				# (root / file).unlink()
+
+				Path(tiramisuPath).symlink_to(correctedFilePath)
+
+				# if (Path(root) / (file.as_posix() + '_tiramisu_corrected')).exists():
+
+				# 	Path(correctedFilePath).resolve().symlink_to((Path(root) / (file.as_posix() + '_tiramisu_corrected')/ correctedFilePath.name).resolve())
+				# else:
+				# 	Path(correctedFilePath).resolve().symlink_to((root / file).resolve())
+
+				# bp()
 
 				if correctedFilePath.suffix == '.zip':
-					zipFiles.append((node_id, tiramisuPath))
+					zipFiles.append((node_id, Path(tiramisuPath).resolve().as_posix()))
 
 				file_df_saved[counter] = {'containerID': node_id, 'name': correctedFilePath.name, 'layer': 'base',
 								  'fileExtension': correctedFilePath.suffix,
@@ -230,10 +246,11 @@ class Base:
 				counter += 1
 
 				utils.lock_files_read_only(correctedFilePath)
+		(self.baseDir / 'files' / 'tmp').mkdir()
 
 		while len(zipFiles) != 0:
 
-			(self.baseDir / 'files' / 'tmp').mkdir()
+			
 
 			zipDir = self.baseDir / 'files'/ 'tmp' / zipFiles[0][0]
 
@@ -250,12 +267,13 @@ class Base:
 					if not '__MACOSX' in zipFile:
 						zipRef.extract(zipFile, zipDir) 
 						
-			Path(zipFiles[0][1]).unlink()
+			# Path(zipFiles[0][1]).unlink()
 
 			for root, dirs, files in os.walk(zipDir, topdown = True):
 				dirs[:] = [d for d in dirs if d not in self.blackList]
 				dirs[:] = [d for d in dirs if d not in repo.ignored(dirs)]
 				files[:] = [f for f in files if f not in repo.ignored(files)]
+				files[:] = [f for f in files if f not in self.blackList]
 				for directory in dirs:
 
 					depth = os.path.join(root, directory).count('/') - start_depth
@@ -276,8 +294,7 @@ class Base:
 					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id )
 					targetPath = (self.baseDir/ 'files'/node_id)
 
-					tiramisuPath.symlink_to(targetPath)
-
+					tiramisuPath.resolve().symlink_to(targetPath.resolve())
 					# with open(tiramisuPath, 'w') as f:
 					# 	pass
 
@@ -286,7 +303,7 @@ class Base:
 					file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 									  'fileExtension': '.folder',
 									  'originalPath': directory.resolve().as_posix(),
-									  'tiramisuPath': tiramisuPath.as_posix(),
+									  'tiramisuPath': targetPath.resolve().as_posix(),
 									  'parentID': parent_id, 'hash': '', 'time': datetime.now()}
 					counter += 1
 
@@ -310,16 +327,32 @@ class Base:
 
 					rootTree.create_node(tag = file.stem, identifier = node_id, data = node_id, parent = parent_id)
 
-					(self.baseDir / 'files' / parent_id).mkdir()
+					(self.baseDir / 'files' / parent_id).mkdir(exist_ok = True)
 
 					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
 
-					utils.copy_files(root / file, tiramisuPath)
+					# utils.copy_files(root / file, tiramisuPath)
 
-					correctedFilePath = utils.verify_file_type(Path(tiramisuPath))
+					# Path(tiramisuPath).resolve().symlink_to((root / file).resolve())
+
+					correctedFilePath = utils.verify_file_type(root / file)
+
+					if correctedFilePath != (root / file):
+						utils.copy_files((root / file), correctedFilePath)
+
+					# (root / file).unlink()
+
+					Path(tiramisuPath).symlink_to(correctedFilePath)
+
+					# if (Path(root) / (file.as_posix() + '_tiramisu_corrected')).exists():
+					# 	Path(correctedFilePath).resolve().symlink_to((Path(root) / (file.as_posix() + '_tiramisu_corrected') / correctedFilePath.name).resolve())
+					# else:
+					# 	Path(correctedFilePath).resolve().symlink_to((root / file).resolve())
+
+					# bp()
 
 					if correctedFilePath.suffix == '.zip':
-						zipFiles.append((node_id, tiramisuPath))
+						zipFiles.append((node_id, Path(tiramisuPath).resolve().as_posix()))
 
 					file_df_saved[counter] = {'containerID': node_id, 'name': correctedFilePath.name, 'layer': 'base',
 									  'fileExtension': correctedFilePath.suffix,
@@ -341,17 +374,22 @@ class Base:
 		with open(self.baseDir / 'hierarchy.json', 'w') as f:
 			json.dump(rootTree.to_dict(with_data = True, sort = True, reverse = False), f)
 
-		self.database = DataFrame.from_dict(file_df_saved, orient='index')
+		database = DataFrame.from_dict(file_df_saved, orient='index')
 
-		self.database.to_parquet(self.baseDir / 'databases' / 'main.parquet')
+		database.to_parquet(self.baseDir / 'databases' / 'main.parquet')
 
-		utils.remove_folder(self.baseDir / 'files' / 'tmp')
+		try:
+			utils.remove_folder(self.baseDir / 'files' / 'tmp')
+		except FileExistsError:
+			print('this shouldnt print')
 
 		repo.git.add(all = True)
 
 		repo.index.commit('0000 == initial digestion complete == 0000')
 
 		del repo
+
+		del database
 
 		return rootTree
 
@@ -424,7 +462,7 @@ class Base:
 
 		# memory management for gitPython as resources can leak
 
-		return git.Repo(self.baseDir)
+		return git.Repo(self.baseDir.parent)
 
 	def return_layers(self):
 

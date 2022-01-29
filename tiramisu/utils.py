@@ -76,6 +76,7 @@ def unlock_files_read_only(filepath):
 def verify_file_type(filepath):
     filename = filepath.name
 
+
     if len(filename.split('.')) == 1:
         extension = ''
     else:
@@ -91,9 +92,13 @@ def verify_file_type(filepath):
             return filepath
         elif extension == '':
             if filetype in inverse_key:
-                filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
+                # filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
 
-                return filepath.parent / (filepath.stem + inverse_key[filetype])
+                correctedPath = filepath.parent / (filename + '_tiramisu_corrected')
+
+                correctedPath.mkdir(parents = True, exist_ok = True)
+
+                return correctedPath / (filepath.stem + inverse_key[filetype])
             else:
                 print(TypeError(f'Wrong filetype: {filetype} is not in the inverse key. \nReturning {filename} as is.'))
                 return filepath
@@ -114,9 +119,13 @@ def verify_file_type(filepath):
             # if the file isn't binary
             if filetype in inverse_key:
 
-                filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
+                # filepath.rename(filepath.parent / (filepath.stem + inverse_key[filetype]))
 
-                return filepath.parent / (filepath.stem + inverse_key[filetype])
+                correctedPath = filepath.parent / (filename + '_tiramisu_corrected')
+
+                correctedPath.mkdir(parents = True, exist_ok = True)
+
+                return correctedPath / (filepath.stem + inverse_key[filetype])
                 
             else:
                 print(TypeError(f'Wrong filetype: {extension} is not in our template. \nReturning {filename} as is.'))
