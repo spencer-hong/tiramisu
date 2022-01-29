@@ -18,7 +18,7 @@ __date = '01/20/2022'
 # file extensions that we validate. any other file type we ingest but do not validate.
 ALLOWED_FILES = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.png', '.tiff', '.jpg', '.zip', '.txt', '.csv']
 
-class Tiramisu:
+class Base:
 	"""Represents the main object that will contain base and layers. Synonymous to a Git repository. 
 	The main class to query parent-child relationships, databases, and layer branches.
 
@@ -169,21 +169,29 @@ class Tiramisu:
 
 				rootTree.create_node( tag = directory, identifier = node_id,  data = node_id, parent = parent_id)
 
-				utils.make_folder(self.baseDir / 'files'/ parent_id)
+				(self.baseDir / 'files'/ parent_id).mkdir()
 
 				directory = Path(directory)
 
-				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id ).as_posix()+ '.folder'
+				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id)
+				
 
-				with open(tiramisuPath, 'w') as f:
-					pass
+				targetPath = self.baseDir / 'files' / node_id
 
-				folderFiles.append(node_id+ '.folder')
+				targetPath.mkdir()
+
+				# with open(tiramisuPath, 'w') as f:
+				# 	pass
+
+				tiramisuPath.symlink_to(targetPath)
+
+
+				# folderFiles.append(node_id+ '.folder')
 
 				file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 								  'fileExtension': '.folder',
 								  'originalPath': directory.resolve().as_posix(),
-								  'tiramisuPath': tiramisuPath,
+								  'tiramisuPath': tiramisuPath.as_posix(),
 								  'parentID': parent_id, 'hash': '', 'time': datetime.now()}
 				counter += 1
 
@@ -203,7 +211,7 @@ class Tiramisu:
 
 				rootTree.create_node(tag = file.stem, identifier = node_id,  data = node_id, parent = parent_id)
 
-				utils.make_folder(self.baseDir / 'files' / parent_id)
+				(self.baseDir / 'files' / parent_id).mkdir()
 
 				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
 
@@ -225,11 +233,11 @@ class Tiramisu:
 
 		while len(zipFiles) != 0:
 
-			utils.make_folder(self.baseDir / 'files' / 'tmp')
+			(self.baseDir / 'files' / 'tmp').mkdir()
 
 			zipDir = self.baseDir / 'files'/ 'tmp' / zipFiles[0][0]
 
-			utils.make_folder(zipDir)
+			zipDir.mkdir()
 
 			start_depth = os.path.join(zipDir, '').count('/')
 
@@ -241,6 +249,8 @@ class Tiramisu:
 					# __MACOSX is a artifact of unzipping in MacOS
 					if not '__MACOSX' in zipFile:
 						zipRef.extract(zipFile, zipDir) 
+						
+			Path(zipFiles[0][1]).unlink()
 
 			for root, dirs, files in os.walk(zipDir, topdown = True):
 				dirs[:] = [d for d in dirs if d not in self.blackList]
@@ -263,17 +273,20 @@ class Tiramisu:
 
 					directory = Path(directory)
 
-					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id ).as_posix()+ '.folder'
+					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id )
+					targetPath = (self.baseDir/ 'files'/node_id)
 
-					with open(tiramisuPath, 'w') as f:
-						pass
+					tiramisuPath.symlink_to(targetPath)
 
-					folderFiles.append(node_id+ '.folder')
+					# with open(tiramisuPath, 'w') as f:
+					# 	pass
+
+					# folderFiles.append(node_id+ '.folder')
 
 					file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 									  'fileExtension': '.folder',
 									  'originalPath': directory.resolve().as_posix(),
-									  'tiramisuPath': tiramisuPath,
+									  'tiramisuPath': tiramisuPath.as_posix(),
 									  'parentID': parent_id, 'hash': '', 'time': datetime.now()}
 					counter += 1
 
@@ -297,7 +310,7 @@ class Tiramisu:
 
 					rootTree.create_node(tag = file.stem, identifier = node_id, data = node_id, parent = parent_id)
 
-					utils.make_folder(self.baseDir / 'files' / parent_id)
+					(self.baseDir / 'files' / parent_id).mkdir()
 
 					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
 
@@ -343,59 +356,59 @@ class Tiramisu:
 		return rootTree
 
 
-	def create_layer(self, layerDescription: str,  pipelineID: int, layerDatabase: DataFrame = None):
+	# def create_layer(self, layerDescription: str,  pipelineID: int, layerDatabase: DataFrame = None):
 
-		commits = self.get_commits()
+	# 	commits = self.get_commits()
 
-		commits = [commit[0] for commit in commits]
+	# 	commits = [commit[0] for commit in commits]
 
-		assert not pipelineID in commits
+	# 	assert not pipelineID in commits
 
-		repo = self.open_repo()
+	# 	repo = self.open_repo()
 
-		repo.git.add(all = True)
+	# 	repo.git.add(all = True)
 
-		repo.index.commit(f'{pipelineID} == {layerDescription} == {pipelineID}')
+	# 	repo.index.commit(f'{pipelineID} == {layerDescription} == {pipelineID}')
 
-		if layerDatabase != None:
+	# 	if layerDatabase != None:
 
-			assert 'containerID' in layerDatabase.columns
+	# 		assert 'containerID' in layerDatabase.columns
 
-			DataFrame.to_parquet(self.baseDir / 'databases' / f'{pipelineID}.parquet')
+	# 		DataFrame.to_parquet(self.baseDir / 'databases' / f'{pipelineID}.parquet')
 
-		del repo
+	# 	del repo
 
-		# layer-specific Databases get saved in /Database
-		# only the folders that saw changes will get added for commit 
-		# we need to shift the files that became parents 
+	# 	# layer-specific Databases get saved in /Database
+	# 	# only the folders that saw changes will get added for commit 
+	# 	# we need to shift the files that became parents 
 
-	def delete_layer(self, pipelineID: int):
+	# def delete_layer(self, pipelineID: int):
 
-		repo = self.open_repo()
+	# 	repo = self.open_repo()
 
-		commit = self.return_commit(pipelineID)
+	# 	commit = self.return_commit(pipelineID)
 
-		repo.git.revert(commit, no_edit = True)
+	# 	repo.git.revert(commit, no_edit = True)
 
-		del repo
+	# 	del repo
 
-		# resets to the commmit right before the layer that will be deleted
+	# 	# resets to the commmit right before the layer that will be deleted
 
-	def invalidate_layer(self, pipelineID: int):
+	# def invalidate_layer(self, pipelineID: int):
 
-		raise NotImplementedError
+	# 	raise NotImplementedError
 
-		# reverts to the commit right before the layer that will be deleted
-		# note that we save this as a commit so we can "undo" this action
+	# 	# reverts to the commit right before the layer that will be deleted
+	# 	# note that we save this as a commit so we can "undo" this action
 
-	def digest_extend(self):
+	# def digest_extend(self):
 
-		raise NotImplementedError
+	# 	raise NotImplementedError
 
-		# add more files to the "base" layer 
-		# files have to be added directly to /hierarchy and /files
-		# more of a debugging function, any significant changes should not be anticipated
-		# we work/anticipate a pretty much fixed set of data
+	# 	# add more files to the "base" layer 
+	# 	# files have to be added directly to /hierarchy and /files
+	# 	# more of a debugging function, any significant changes should not be anticipated
+	# 	# we work/anticipate a pretty much fixed set of data
 
 	def get_commits(self):
 
@@ -494,20 +507,20 @@ class Tiramisu:
 			print("%s %s %s" % (c1.ljust(40), str(c2).ljust(25), c3))
 
 
-def return_file_phases(tiramisu: Tiramisu, originalFilePath: str, fileID: str = None):
+# def return_file_phases(tiramisu: Tiramisu, originalFilePath: str, fileID: str = None):
 
-	raise NotImplementedError
+# 	raise NotImplementedError
 
-	# returns file phases/commits given a fileID or originalFilePath
+# 	# returns file phases/commits given a fileID or originalFilePath
 
-def return_layer_orders(tiramisu: Tiramisu):
+# def return_layer_orders(tiramisu: Tiramisu):
 
-	raise NotImplementedError
+# 	raise NotImplementedError
 
-	# returns the layer order
+# 	# returns the layer order
 
-def return_summary(tiramisu: Tiramisu):
+# def return_summary(tiramisu: Tiramisu):
 
-	raise NotImplementedError
+# 	raise NotImplementedError
 
-	# returns the summary of current Tiramisu 
+# 	# returns the summary of current Tiramisu 

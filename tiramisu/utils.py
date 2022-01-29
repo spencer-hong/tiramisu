@@ -7,7 +7,7 @@ from pdb import set_trace as bp
 from magic import from_file
 import hashlib
 
-# taken from @holger, treelib repository
+# partially taken from @holger, treelib repository
 
 
 def generate_hash(filepath):
@@ -61,10 +61,7 @@ def copy_files(source_path, to_path):
 def write_gitignore(path):
     copy_files('_gitignore_template', Path(path) / '.gitignore')
 
-def make_folder(path):
-    # accepts pathlib Path object
-    path.mkdir(parents = False, exist_ok = True)
-
+# removing a non-empty folder
 def remove_folder(path):
     rmtree(path)
 
