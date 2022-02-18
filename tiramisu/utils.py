@@ -88,7 +88,7 @@ def verify_file_type(filepath):
 
     if extension not in built_in_key:
         if filetype == 'application/octet-stream':
-            print(TypeError(f'Binary filetype: {filetype} will not be analyzed due to security reasons. \nReturning {filename} as is.'))
+            # print(TypeError(f'Binary filetype: {filetype} will not be analyzed due to security reasons. \nReturning {filename} as is.'))
             return filepath
         elif extension == '':
             if filetype in inverse_key:
@@ -100,17 +100,17 @@ def verify_file_type(filepath):
 
                 return correctedPath / (filepath.stem + inverse_key[filetype])
             else:
-                print(TypeError(f'Wrong filetype: {filetype} is not in the inverse key. \nReturning {filename} as is.'))
+                # print(TypeError(f'Wrong filetype: {filetype} is not in the inverse key. \nReturning {filename} as is.'))
                 return filepath
         else:
-            print(TypeError(f'Wrong filetype: {extension} is not in our template. \nReturning {filename} as is.'))
+            # print(TypeError(f'Wrong filetype: {extension} is not in our template. \nReturning {filename} as is.'))
             return filepath
     else:
         # this is when the file extension is correct
 
         # ignore binary files
         if filetype == 'application/octet-stream':
-            print(TypeError(f'Binary filetype: {filetype} will not be analyzed due to security reasons. \nReturning {filename} as is.'))
+            # print(TypeError(f'Binary filetype: {filetype} will not be analyzed due to security reasons. \nReturning {filename} as is.'))
 
             return filepath
         elif built_in_key[extension] == filetype:
@@ -128,7 +128,7 @@ def verify_file_type(filepath):
                 return correctedPath / (filepath.stem + inverse_key[filetype])
                 
             else:
-                print(TypeError(f'Wrong filetype: {extension} is not in our template. \nReturning {filename} as is.'))
+                # print(TypeError(f'Wrong filetype: {extension} is not in our template. \nReturning {filename} as is.'))
                 return filepath
 
 

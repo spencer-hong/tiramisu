@@ -11,7 +11,7 @@ from zipfile import ZipFile
 from pandas import DataFrame
 import utils 
 from datetime import datetime
-
+from tqdm import tqdm
 __author = 'Spencer Hong'
 __date = '01/20/2022'
 
@@ -53,24 +53,16 @@ class Base:
 		try:
 			assert (self.baseDir).exists()
 		except:
-			print('folder doesnt exist!')
-
-
-		(self.baseDir / '.tiramisu').mkdir()
+			raise FileNotFoundError('Make sure that the input directory exists!')
 
 		self.baseDir  = (self.baseDir / '.tiramisu').resolve()
 
 		self.description = description
 
-		# self.pipelineIDs = []
-
 		if blackList == None:
 			self.blackList = ['.git', '.gitignore']
-		elif '.git' in blackList:
-			self.blackList = blackList
 		else:
-			self.blackList = blackList.append('.git')
-			self.blackList = blackList.append('.gitignore')
+			self.blackList = self.blackList + ['.git', '.gitignore']
 
 		self.name = name
 		try:
@@ -90,6 +82,8 @@ class Base:
 			assert (self.baseDir /  'databases').exists() == True
 
 		except git.exc.InvalidGitRepositoryError:
+
+			self.baseDir.mkdir()
 
 			self.baseMetadata = {
 				'_name': self.name,
@@ -122,42 +116,33 @@ class Base:
 
 		del self.repo
 
-	def digest(self, sourceDir: str, allowedFiles: list = ALLOWED_FILES):
+	def digest(self, allowedFiles: list = ALLOWED_FILES):
 
-		# call the old tiramisu digest
-
-		# modify the digest function so that /hierarchy have "empty" files (.folder, .file)
-
-		# /files will contain the fileA/fileA.pdf
-
-		# dictionary to save all digested files and their information
+		start = datetime.now()
 
 		repo = self.open_repo()
 		file_df_saved = {}
 
 		rootTree = tree.Tree()
-
-		# first container is always the root container
-		
-		# this variable keeps track of the folders that base files are in
-
-		folderFiles = []
 		zipFiles = []
 
 		counter = 1
 
-		start_depth = os.path.join(sourceDir, '').count('/')
+		start_depth = os.path.join(self.baseDir.parent, '').count('/')
 
-		rootTree.create_node(tag = sourceDir, identifier = 'ROOT', data = 'ROOT')
+		rootTree.create_node(tag = self.baseDir.parent.as_posix(), identifier = 'ROOT', data = 'ROOT')
 
+		for root, dirs, files in tqdm(os.walk(self.baseDir.parent, topdown = True), total = len(list(os.walk(self.baseDir.parent)))):
+			print(f'Processing {root}')
+			print('\n')
+			print(datetime.now() - start)
 
-		for root, dirs, files in os.walk(sourceDir, topdown = True):
-			dirs[:] = [d for d in dirs if d not in self.blackList]
-			dirs[:] = [d for d in dirs if d not in repo.ignored(dirs)]
-			files[:] = [f for f in files if f not in repo.ignored(files)]
-			files[:] = [f for f in files if f not in self.blackList]
+			files_to_ignore = set(repo.ignored(files))
+			dirs_to_ignore = set(repo.ignored(dirs))
+
+			dirs[:] = set(dirs) - set(dirs_to_ignore)
+			files[:] = set(files) - set(files_to_ignore)
 			for directory in dirs:
-
 				
 				depth = os.path.join(root, directory).count('/') - start_depth
 
@@ -165,28 +150,19 @@ class Base:
 
 				parent_id = utils.get_parent_id(depth, root, directory)
 
-
 				rootTree.create_node( tag = directory, identifier = node_id,  data = node_id, parent = parent_id)
 
 				(self.baseDir / 'files'/ parent_id).mkdir(exist_ok=True)
 
-				directory = Path(directory)
-
 				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id)
 				
-
 				targetPath = self.baseDir / 'files' / node_id
 
 				targetPath.mkdir()
 
-				# with open(tiramisuPath, 'w') as f:
-				# 	pass
+				tiramisuPath.resolve().symlink_to(targetPath.resolve())
 
-				try:
-					tiramisuPath.resolve().symlink_to(targetPath.resolve())
-				except:
-					bp()
-				# folderFiles.append(node_id+ '.folder')
+				directory = Path(directory)
 
 				file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 								  'fileExtension': '.folder',
@@ -194,46 +170,37 @@ class Base:
 								  'tiramisuPath': targetPath.resolve().as_posix(),
 								  'parentID': parent_id, 'hash': '', 'time': datetime.now()}
 				counter += 1
-
 			for file in files:
 
 				if root in self.blackList:
-					continue
-				if file in folderFiles:
 					continue
 
 				depth = os.path.join(root, file).count('/') - start_depth
 
 				file = Path(file)
 
-				node_id = utils.assign_node_id(depth, root, file.stem)
-				parent_id = utils.get_parent_id(depth, root, file.stem)
-
-				rootTree.create_node(tag = file.stem, identifier = node_id,  data = node_id, parent = parent_id)
+				node_id = utils.assign_node_id(depth, root, file.name)
+				parent_id = utils.get_parent_id(depth, root, file.name)
 
 				(self.baseDir / 'files' / parent_id).mkdir(exist_ok=True)
 
-				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
-
-				# utils.copy_files(root / file, tiramisuPath)
-
 				correctedFilePath = utils.verify_file_type(root / file)
+
+				try:
+					rootTree.create_node(tag = correctedFilePath.name, identifier = node_id,  data = node_id, parent = parent_id)
+				except:
+					bp()
+					
 
 				if correctedFilePath != (root / file):
 
 					utils.copy_files((root / file), correctedFilePath)
 
-				# (root / file).unlink()
+					(root / file).unlink()
+
+				tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + correctedFilePath.suffix
 
 				Path(tiramisuPath).symlink_to(correctedFilePath)
-
-				# if (Path(root) / (file.as_posix() + '_tiramisu_corrected')).exists():
-
-				# 	Path(correctedFilePath).resolve().symlink_to((Path(root) / (file.as_posix() + '_tiramisu_corrected')/ correctedFilePath.name).resolve())
-				# else:
-				# 	Path(correctedFilePath).resolve().symlink_to((root / file).resolve())
-
-				# bp()
 
 				if correctedFilePath.suffix == '.zip':
 					zipFiles.append((node_id, Path(tiramisuPath).resolve().as_posix()))
@@ -246,11 +213,10 @@ class Base:
 				counter += 1
 
 				utils.lock_files_read_only(correctedFilePath)
+
 		(self.baseDir / 'files' / 'tmp').mkdir()
 
 		while len(zipFiles) != 0:
-
-			
 
 			zipDir = self.baseDir / 'files'/ 'tmp' / zipFiles[0][0]
 
@@ -270,10 +236,8 @@ class Base:
 			# Path(zipFiles[0][1]).unlink()
 
 			for root, dirs, files in os.walk(zipDir, topdown = True):
-				dirs[:] = [d for d in dirs if d not in self.blackList]
 				dirs[:] = [d for d in dirs if d not in repo.ignored(dirs)]
 				files[:] = [f for f in files if f not in repo.ignored(files)]
-				files[:] = [f for f in files if f not in self.blackList]
 				for directory in dirs:
 
 					depth = os.path.join(root, directory).count('/') - start_depth
@@ -286,8 +250,10 @@ class Base:
 					node_id = utils.assign_node_id(depth, root, directory)
 
 					rootTree.create_node(tag = directory, identifier = node_id, data = node_id, parent = parent_id)
-
-					assert (self.baseDir / 'files'/ parent_id).exists() == True
+					try:
+						assert (self.baseDir / 'files'/ parent_id).exists() == True
+					except:
+						(self.baseDir / 'files'/ parent_id).mkdir()
 
 					directory = Path(directory)
 
@@ -295,10 +261,6 @@ class Base:
 					targetPath = (self.baseDir/ 'files'/node_id)
 
 					tiramisuPath.resolve().symlink_to(targetPath.resolve())
-					# with open(tiramisuPath, 'w') as f:
-					# 	pass
-
-					# folderFiles.append(node_id+ '.folder')
 
 					file_df_saved[counter] = {'containerID': node_id, 'name': directory.name, 'layer': 'base',
 									  'fileExtension': '.folder',
@@ -309,47 +271,33 @@ class Base:
 
 				for file in files:
 
-					if root in self.blackList:
-						continue
-					if file in folderFiles:
-						continue
+					# if root in self.blackList:
+					# 	continue
 
 					depth = os.path.join(root, file).count('/') - start_depth
+					file = Path(file)
 
 					if depth == 0:
 						parent_id = zipFiles[0][0]
 					else:
-						parent_id = utils.get_parent_id(depth, root, file.stem)
+						parent_id = utils.get_parent_id(depth, root, file.name)
 
-					file = Path(file)
-
-					node_id = utils.assign_node_id(depth, root, file.stem)
-
-					rootTree.create_node(tag = file.stem, identifier = node_id, data = node_id, parent = parent_id)
+					node_id = utils.assign_node_id(depth, root, file.name)
 
 					(self.baseDir / 'files' / parent_id).mkdir(exist_ok = True)
 
-					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + file.suffix
-
-					# utils.copy_files(root / file, tiramisuPath)
-
-					# Path(tiramisuPath).resolve().symlink_to((root / file).resolve())
-
 					correctedFilePath = utils.verify_file_type(root / file)
+
+					tiramisuPath = (self.baseDir / 'files'/ parent_id / node_id).as_posix() + correctedFilePath.suffix
+
+					rootTree.create_node(tag = correctedFilePath.name, identifier = node_id, data = node_id, parent = parent_id)
 
 					if correctedFilePath != (root / file):
 						utils.copy_files((root / file), correctedFilePath)
 
-					# (root / file).unlink()
+						(root / file).unlink()
 
 					Path(tiramisuPath).symlink_to(correctedFilePath)
-
-					# if (Path(root) / (file.as_posix() + '_tiramisu_corrected')).exists():
-					# 	Path(correctedFilePath).resolve().symlink_to((Path(root) / (file.as_posix() + '_tiramisu_corrected') / correctedFilePath.name).resolve())
-					# else:
-					# 	Path(correctedFilePath).resolve().symlink_to((root / file).resolve())
-
-					# bp()
 
 					if correctedFilePath.suffix == '.zip':
 						zipFiles.append((node_id, Path(tiramisuPath).resolve().as_posix()))
@@ -364,7 +312,7 @@ class Base:
 					utils.lock_files_read_only(correctedFilePath)
 			del zipFiles[0]
 
-
+		print(datetime.now() - start)
 
 		if (self.baseDir / 'hierarchy.txt').exists():
 			(self.baseDir / 'hierarchy.txt').unlink()
@@ -378,20 +326,19 @@ class Base:
 
 		database.to_parquet(self.baseDir / 'databases' / 'main.parquet')
 
-		try:
-			utils.remove_folder(self.baseDir / 'files' / 'tmp')
-		except FileExistsError:
-			print('this shouldnt print')
+		utils.remove_folder(self.baseDir / 'files' / 'tmp')
 
 		repo.git.add(all = True)
 
 		repo.index.commit('0000 == initial digestion complete == 0000')
 
+		print(datetime.now() - start)
+
 		del repo
 
 		del database
 
-		return rootTree
+		# return rootTree
 
 
 	# def create_layer(self, layerDescription: str,  pipelineID: int, layerDatabase: DataFrame = None):

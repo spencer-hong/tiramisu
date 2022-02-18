@@ -154,3 +154,5 @@ cython_debug/
 
 # Tiramisu
 .tiramisu/
+.git
+.gitignore

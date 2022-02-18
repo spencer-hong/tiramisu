@@ -6,6 +6,11 @@ Each file is a container that may contain more than one file. This allows Tirami
 
 This library was created for the archive-digestion project. Tiramisu is the foundation of the overall dockerized pipeline controlled by Luigi.
 
+## Most Recent Update (02/18/22)   
+Tiramisu has been developed into a full, comprehensive Docker Compose service with an isolated API, NGINX/Gunicorn servers, automatic testing, and a React-based front end. This can be seen here: https://github.com/amarallab/tiramisu. This is currently a private project in the Amaral Lab.
+
+
+
 
 ## Installation
 
