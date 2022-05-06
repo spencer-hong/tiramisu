@@ -1,27 +1,10 @@
-# tiramisu
- A file management system with the base-layer-container approach
-
-Files are digested at the base level. Any edits/changes/expansion of files are saved as layers on top of the base.   
-Each file is a container that may contain more than one file. This allows Tiramisu to maintain parent-child relationships and one-to-one & one-to-many relationships. Tiramisu takes advantage of Git as its version control system where each commit is a "layer" on top of the base. Therefore, each tiramisu can be seen as a Git repository. 
-
-This library was created for the archive-digestion project. Tiramisu is the foundation of the overall dockerized pipeline controlled by Luigi.
+# Tiramisu
+ A file management system with the base-layer-container approach using Docker, Neo4J, and Celery.
 
 ## Most Recent Update (02/18/22)   
-Tiramisu has been developed into a full, comprehensive Docker Compose service with an isolated API, NGINX/Gunicorn servers, automatic testing, and a React-based front end. This can be seen here: https://github.com/amarallab/tiramisu. This is currently a private project in the Amaral Lab.
+Tiramisu has been developed into a full, comprehensive Docker service with Celery-powered task manager, React-powered frontend, Neo4J database, Docker volume expoed by Samba protocol, flask-based APi and Nginx web proxy. Automated testing is also integrated. For the moment, the project is private under https://github.com/amarallab/tiramisu until publication. We aim to release this package under open-source. We will update this repository once the project is released.
 
+## Who can use it?
+If you are tracking thousands or millions of files that are comprised of logical documents, Tiramisu is for you. Tiramisu is also a good starting foundation to build any file tracker/manager/worker as Neo4J will save relationships, attributes, and children from a file. Tiramisu is also built with non-computational savvy people in mind, as most actions can be done by clicking buttons on the React-based frontend. Tasks can be visualized on a different endpoint powered by Flower. 
 
-
-
-## Installation
-
-Tiramisu depends on Pandas (parquet management), python-magic (file correction), treelib (hierarchy), gitPython (Git management), and pyYAML (printing). These are all mature libraries that should not break. To install python-magic,  
-`brew install libmagic` for OSX   
-`sudo apt-get install libmagic1` for Linux  
-
-then follow with `pip install python-magic`
-
-## Known limitations  
-
-| Limitation | Plans to fix it? |
-| --------------- | --------------- |
-| Unzipping only supports .zip files | Yes |
+Tiramisu is most suitable for running on an isolated cluster/server and have clients connect via SSH or interact with filesystem using Samba. 
